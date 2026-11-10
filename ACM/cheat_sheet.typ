@@ -1,4 +1,35 @@
-# 缺省源
+#set page(
+  paper: "a4",
+  margin: (x: 1.2cm, top: 1.8cm, bottom: 1.8cm),
+  header: align(right)[#text(8pt, fill: gray)[Cheat Sheet]],
+  footer: context align(center)[
+    #text(9pt)[ #counter(page).display("1")  / #counter(page).final().first()]
+  ]
+)
+
+#set text(font: ("Noto Sans CJK SC", "JetBrains Mono"), size: 9pt)
+#show raw: set text(font: ("JetBrains Mono", "Noto Sans Mono CJK SC"), size: 8pt)
+#set par(justify: true, leading: 0.5em)
+
+#show raw.where(block: true): block.with(
+  fill: rgb("#f8f9fa"),
+  inset: 6pt,
+  radius: 3pt,
+  stroke: 0.5pt + rgb("#e1e4e8"),
+  width: 100%,
+)
+
+#align(center)[#text(16pt, weight: "bold")[TOC]]
+#v(1em)
+#outline(
+  title: none,
+  depth: 3,
+  indent: auto
+)
+
+#pagebreak()
+
+= 缺省源
 ```cpp
 #include <bits/stdc++.h>
 #define all(x) (x).begin(), (x).end()
@@ -20,11 +51,11 @@ using f64 = double;
 using f128 = long double;
 ```
 
-## 基础算法
-### 二分
+= 基础算法
+== 二分
 统一采用闭区间 `[l, r]`：
-- `bs_first`: 查找满足 `check(x)` 的**首个（最小）**位置（性质为 `000...111`，无解返回 -1）
-- `bs_last`: 查找满足 `check(x)` 的**最后一个（最大）**位置（性质为 `111...000`，无解返回 -1）
+- `bs_first`: 查找满足 `check(x)` 的*首个（最小）*位置（性质为 `000...111`，无解返回 -1）
+- `bs_last`: 查找满足 `check(x)` 的*最后一个（最大）*位置（性质为 `111...000`，无解返回 -1）
 
 ```cpp
 bool check(i32 mid);
@@ -74,14 +105,18 @@ void example_bound() {
 }
 ```
 
-| **函数** | **返回** | **若值存在** | **若值不存在** | **典型应用** |
-| --- | --- | --- | --- | --- |
-| `lower_bound` | 第一个 $\geqslant \text{target}$ 的迭代器 | 目标值的第一个位置 | 第一个比它大的元素 | 查找元素、插入位置 |
-| `upper_bound` | 第一个 $> \text{target}$ 的迭代器 | 跳过所有相同值的元素 | 第一个比它大的元素 | 计算元素出现次数 |
-| `lower_bound - 1` | 最后一个 $< \text{target}$ 的迭代器 | 目标值前一个元素 | 最大的小于 $\text{target}$ 的元素 | 反向查找小于目标值 |
-| `upper_bound - 1` | 最后一个 $\leqslant \text{target}$ 的迭代器 | 目标值最后一个位置 | 最大的小于等于 $\text{target}$ 的元素 | 反向查找小于等于目标值 |
+#table(
+  columns: (auto, 1.2fr, 1fr, 1fr, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [*函数*], [*返回*], [*若值存在*], [*若值不存在*], [*典型应用*],
+  [`lower_bound`], [第一个 $gt.eq "target"$ 的迭代器], [目标值的第一个位置], [第一个比它大的元素], [查找元素、插入位置],
+  [`upper_bound`], [第一个 $> "target"$ 的迭代器], [跳过所有相同值的元素], [第一个比它大的元素], [计算元素出现次数],
+  [`lower_bound - 1`], [最后一个 $< "target"$ 的迭代器], [目标值前一个元素], [最大的小于 $"target"$ 的元素], [反向查找小于目标值],
+  [`upper_bound - 1`], [最后一个 $lt.eq "target"$ 的迭代器], [目标值最后一个位置], [最大的小于等于 $"target"$ 的元素], [反向查找小于等于目标值],
+)
 
-### 高精度
+== 高精度
 ```cpp
 constexpr i32 base = 1e9;
 
@@ -166,7 +201,7 @@ ostream& operator<<(ostream& os, const BigInt& v) {
 }
 ```
 
-### 网络流
+== 网络流
 使用静态链式前向星数组，包含 Dinic 最大流与基于势能 Dijkstra 的最小费用最大流（MCMF），节点均为 0-based。
 ```cpp
 constexpr i32 maxn = 5005, m = 100005;
@@ -265,17 +300,17 @@ pair<i64, i64> mcmf(i32 s, i32 t, i32 num_nodes) {
 }
 ```
 
-## 数据结构
-### 树状数组
-使用**群论 / 阿贝尔群（Abelian Group）代数架构**高度抽象，采用**结构体（struct）**紧凑风格封装，下标统一采用 **1-based**（$1 \le p \le n$），区间查询统一为闭区间 $[l, r]$。
+= 数据结构
+== 树状数组
+使用*群论 / 阿贝尔群（Abelian Group）代数架构*高度抽象，采用*结构体（struct）*紧凑风格封装，下标统一采用 *1-based*（$1 <= p <= n$），区间查询统一为闭区间 $[l, r]$。
 
-#### 1. 代数接口说明
-- **群元素类型 $S$**
-- **可交换可结合二元运算 `op(const S&, const S&)`**：满足 $(a \cdot b) \cdot c = a \cdot (b \cdot c)$ 与 $a \cdot b = b \cdot a$。
-- **单位元 `e()`**：满足 $a \cdot e = a$。
-- **群逆元 `inv(const S&)`**：满足 $a \cdot a^{-1} = e$。当需要区间查询 $[l, r]$ 时，通过差分运算 $P(r) \cdot \text{inv}(P(l-1))$ 求解（如加法群的相反数 $-x$、异或群的自身 $x$）。若仅需前缀查询则无需逆元。
+=== 1. 代数接口说明
+- *群元素类型 $S$*
+- *可交换可结合二元运算 `op(const S&, const S&)`*：满足 $(a dot b) dot c = a dot (b dot c)$ 与 $a dot b = b dot a$。
+- *单位元 `e()`*：满足 $a dot e = a$。
+- *群逆元 `inv(const S&)`*：满足 $a dot a^(-1) = e$。当需要区间查询 $[l, r]$ 时，通过差分运算 $P(r) dot "inv"(P(l-1))$ 求解（如加法群的相反数 $-x$、异或群的自身 $x$）。若仅需前缀查询则无需逆元。
 
-#### 2. 核心模板实现
+=== 2. 核心模板实现
 ```cpp
 // 树状数组 (Fenwick Tree，阿贝尔群代数抽象，1-based)
 template <typename S,
@@ -359,10 +394,10 @@ namespace FenwickXor {
 }
 ```
 
-### 线段树
-使用**群论 / Monoid Action 架构（幺半群及群作用）**高度抽象，改用**结构体（struct）**紧凑风格封装，代数接口与修改值统一采用**常引用传参（`const S&` / `const F&`）**避免拷贝，区间操作统一闭区间 `[l, r]`（静态线段树默认 1-based）。
+== 线段树
+使用*群论 / Monoid Action 架构（幺半群及群作用）*高度抽象，改用*结构体（struct）*紧凑风格封装，代数接口与修改值统一采用*常引用传参（`const S&` / `const F&`）*避免拷贝，区间操作统一闭区间 `[l, r]`（静态线段树默认 1-based）。
 
-#### 1. 核心模板实现
+=== 1. 核心模板实现
 ```cpp
 // 动态开点 Lazy 线段树 (Monoid Action, struct 紧凑风格, 闭区间 [l, r], 引用传参)
 template <typename S, S (*op)(const S&, const S&), S (*e)(),
@@ -528,23 +563,27 @@ struct StaticLazySegTree {
 };
 ```
 
-#### 2. 代数接口定义说明
+=== 2. 代数接口定义说明
 
-抽象线段树将业务逻辑全盘交给以下 **5 个代数接口** 决定（幺半群作用系统，统一使用常引用避免拷贝）：
+抽象线段树将业务逻辑全盘交给以下 *5 个代数接口* 决定（幺半群作用系统，统一使用常引用避免拷贝）：
 
-| **接口名称** | **函数签名** | **群论含义与代数性质** |
-| --- | --- | --- |
-| `op` | `S(const S& a, const S& b)` | 数据幺半群的二元运算，需满足**结合律**：`op(op(a, b), c) == op(a, op(b, c))`。 |
-| `e` | `S()` | 数据幺半群的**单位元**。需满足对任意 `x` 有 `op(x, e()) == op(e(), x) == x`。 |
-| `mapping` | `S(const F& tag, const S& val, i64 len)` | 群作用 $\cdot: F \times S \to S$。将变换 `tag` 作用于区间长度为 `len` 的节点值 `val` 上。 |
-| `composition` | `F(const F& new_tag, const F& old_tag)` | 作用幺半群的复合运算，对应映射复合 $(f \circ g)(x) = f(g(x))$。 |
-| `identity_f` | `F()` | 作用幺半群的**恒等变换（单位元）**。满足对任意 `f` 有 `composition(f, id) == composition(id, f) == f`。 |
+#table(
+  columns: (auto, auto, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [*接口名称*], [*函数签名*], [*群论含义与代数性质*],
+  [`op`], [`S(const S& a, const S& b)`], [数据幺半群的二元运算，需满足*结合律*：`op(op(a, b), c) == op(a, op(b, c))`。],
+  [`e`], [`S()`], [数据幺半群的*单位元*。需满足对任意 `x` 有 `op(x, e()) == op(e(), x) == x`。],
+  [`mapping`], [`S(const F& tag, const S& val, i64 len)`], [群作用 $dot: F times S -> S$。将变换 `tag` 作用于区间长度为 `len` 的节点值 `val` 上。],
+  [`composition`], [`F(const F& new_tag, const F& old_tag)`], [作用幺半群的复合运算，对应映射复合 $(f compose g)(x) = f(g(x))$。],
+  [`identity_f`], [`F()`], [作用幺半群的*恒等变换（单位元）*。满足对任意 `f` 有 `composition(f, id) == composition(id, f) == f`。],
+)
 
-#### 3. 常见场景配置与示例
+=== 3. 常见场景配置与示例
 
-##### 场景一：区间加法 + 区间求和
-- **映射规则**：区间和增加 `tag * len`
-- **标记复合**：累加 `new_tag + old_tag`
+==== 场景一：区间加法 + 区间求和
+- *映射规则*：区间和增加 `tag * len`
+- *标记复合*：累加 `new_tag + old_tag`
 
 ```cpp
 namespace RangeAddSum {
@@ -576,9 +615,9 @@ void test_range_add_sum() {
 }
 ```
 
-##### 场景二：区间加法 + 区间最大值
-- **映射规则**：区间最大值增加 `tag`（与区间长度无关）
-- **单位元**：极小值作为幺半群零元
+==== 场景二：区间加法 + 区间最大值
+- *映射规则*：区间最大值增加 `tag`（与区间长度无关）
+- *单位元*：极小值作为幺半群零元
 
 ```cpp
 namespace RangeAddMax {
@@ -607,9 +646,9 @@ void test_range_add_max() {
 }
 ```
 
-##### 场景三：区间赋值 + 区间最小值
-- **映射规则**：覆盖为 `tag`
-- **标记复合**：新标记直接覆盖旧标记
+==== 场景三：区间赋值 + 区间最小值
+- *映射规则*：覆盖为 `tag`
+- *标记复合*：新标记直接覆盖旧标记
 
 ```cpp
 namespace RangeSetMin {
@@ -639,10 +678,10 @@ void test_range_set_min() {
 }
 ```
 
-##### 场景四：复合操作（区间乘法 & 区间加法 + 区间求和）
-需要同时维护乘法 $a$ 和加法 $b$（仿射变换群 $x \mapsto a \cdot x + b$），带取模。
-- **标记结构**：结构体 `{mul, add}`
-- **标记复合**：若先后作用 $(a_1, b_1)$ 和 $(a_2, b_2)$，新值为 $a_2(a_1 x + b_1) + b_2 = (a_2 a_1) x + (a_2 b_1 + b_2)$
+==== 场景四：复合操作（区间乘法 & 区间加法 + 区间求和）
+需要同时维护乘法 $a$ 和加法 $b$（仿射变换群 $x |-> a dot x + b$），带取模。
+- *标记结构*：结构体 `{mul, add}`
+- *标记复合*：若先后作用 $(a_1, b_1)$ 和 $(a_2, b_2)$，新值为 $a_2(a_1 x + b_1) + b_2 = (a_2 a_1) x + (a_2 b_1 + b_2)$
 
 ```cpp
 namespace RangeAffineSum {
@@ -690,7 +729,7 @@ void test_range_affine() {
 }
 ```
 
-### 静态线段树
+== 静态线段树
 ```cpp
 struct {
     i64 sum=0,lz=0;
@@ -741,7 +780,7 @@ i64 query(i32 u,i32 l,i32 r,i32 ql,i32 qr) {
 }
 ```
 
-### 动态开点线段树
+== 动态开点线段树
 ```cpp
 struct {
     i32 ls=0,rs=0;
@@ -793,7 +832,7 @@ i64 query(i32 u,i64 l,i64 r,i64 ql,i64 qr) {
     return res;
 }
 ```
-#### 线段树合并
+=== 线段树合并
 适用于单点修改，无懒标记
 ```cpp
 i32 merge(i32 u,i32 v,i64 l,i64 r) {
@@ -810,7 +849,7 @@ i32 merge(i32 u,i32 v,i64 l,i64 r) {
 }
 ```
 
-#### 4. 调试函数
+=== 4. 调试函数
 ```cpp
 // 静态线段树调试打印 (亦可直接调用 seg.debug())
 template <typename S, S (*op)(const S&, const S&), S (*e)(), typename F, S (*mapping)(const F&, const S&, i64), F (*composition)(const F&, const F&), F (*identity_f)(), i32 maxn>
@@ -819,7 +858,7 @@ void debug_static_tree(const StaticLazySegTree<S, op, e, F, mapping, composition
 }
 ```
 
-### 并查集
+== 并查集
 静态全局数组，1-based（默认兼容 0 ~ n）：
 ```cpp
 constexpr i32 maxn = 200005;
@@ -849,7 +888,7 @@ bool merge(i32 x, i32 y) {
 }
 ```
 
-### 主席树
+== 主席树
 ```cpp
 struct {
     i32 ls=0,rs=0;
@@ -883,7 +922,7 @@ i64 kth(i32 u,i32 v,i64 l,i64 r,i64 k) {
     return kth(tr[u].rs,tr[v].rs,mid+1,r,k-left);
 }
 ```
-### 树状数组套权值线段树
+== 树状数组套权值线段树
 ```cpp
 #include <bits/stdc++.h>
 using namespace std;
@@ -936,7 +975,7 @@ i64 kth(i64 l,i64 r,i64 k) {
 }
 ```
 
-### FHQ Treap
+== FHQ Treap
 ```cpp
 #include <bits/stdc++.h>
 using namespace std;
@@ -1031,7 +1070,7 @@ i32 nxt(i32 v) {
     return res;
 }
 ```
-### Splay
+== Splay
 ```cpp
 constexpr i64 inf = numeric_limits<i64>::max() / 2;
 struct {
@@ -1151,7 +1190,7 @@ void init() {
 }
 ```
 
-### 分块
+== 分块
 ```cpp
 i32 a[maxn];
 i32 L[maxn],R[maxn],bid[maxn],B;
@@ -1191,8 +1230,8 @@ i32 query(i32 l,i32 r){
 }
 ```
 
-### 普通莫队
-理论最优块长 $\max\left(1, \lfloor \frac{n}{\sqrt{q}} \rfloor\right)$
+== 普通莫队
+理论最优块长 $max(1, floor(frac(n, sqrt(q))))$
 ```cpp
 struct Query{
     i32 l,r,id,b;
@@ -1230,12 +1269,12 @@ signed main(){
 }
 ```
 
-### 带修莫队
-理论最优块长 $ \sqrt {\frac {2n^2t}{m}} $
+== 带修莫队
+理论最优块长 $sqrt(frac(2n^2t, m))$
 
 t 为修改次数，m 为查询次数
 
-实践中推荐 $ n^{2/3} $
+实践中推荐 $n^(2/3)$
 ```cpp
 struct Query{
     i32 l,r,t,id;
@@ -1305,7 +1344,7 @@ signed main(){
 }
 ```
 
-### 分数类
+== 分数类
 紧凑分数结构体，利用 `i128` 安全跨乘比较：
 ```cpp
 struct Frac {
@@ -1354,10 +1393,10 @@ struct Frac {
 };
 ```
 
-## DP
+= DP
 静态全局数组，0-based：
 
-### 01背包
+== 01背包
 ```cpp
 constexpr i32 v = 100005;
 i64 dp[v];
@@ -1371,7 +1410,7 @@ void knapsack01(i32 n, i32 cap, const i32 w[], const i64 val[]) {
 }
 ```
 
-### 完全背包
+== 完全背包
 ```cpp
 constexpr i32 v = 100005;
 i64 dp[v];
@@ -1385,7 +1424,7 @@ void knapsack_complete(i32 n, i32 cap, const i32 w[], const i64 val[]) {
 }
 ```
 
-### 多重背包
+== 多重背包
 二进制拆分转化为 0-1 背包：
 ```cpp
 constexpr i32 v = 100005;
@@ -1408,7 +1447,7 @@ void knapsack_bounded(i32 n, i32 cap, const i32 w[], const i64 val[], const i32 
 }
 ```
 
-### 分组背包（每组物品最多选 1 个）
+== 分组背包（每组物品最多选 1 个）
 ```cpp
 constexpr i32 v = 100005;
 i64 dp[v];
@@ -1427,7 +1466,7 @@ void knapsack_group(i32 group_cnt, i32 cap, const vector<Item> groups[]) {
 }
 ```
 
-### 二维费用背包
+== 二维费用背包
 ```cpp
 constexpr i32 v1 = 1005, v2 = 1005;
 i64 dp2d[v1][v2];
@@ -1444,7 +1483,7 @@ void knapsack2d(i32 n, i32 cap1, i32 cap2, const i32 w1[], const i32 w2[], const
 }
 ```
 
-### 树形/有依赖的背包
+== 树形/有依赖的背包
 ```cpp
 constexpr i32 maxn = 1005, v = 1005;
 i64 dp_tree[maxn][v];
@@ -1465,8 +1504,8 @@ void tree_knapsack_dfs(i32 u, i32 cap, const i32 w[], const i64 val[]) {
 }
 ```
 
-## 字符串
-### KMP
+= 字符串
+== KMP
 前缀函数 `nxt` 静态数组，0-based：
 ```cpp
 constexpr i32 maxn = 1000005;
@@ -1500,10 +1539,10 @@ vector<i32> kmp(const string& s, const string& p) {
 }
 ```
 
-### KMP 自动机
-将模式串 $p$ 构建为确定性有限状态自动机 (DFA)。状态 $u \in [0, m]$ 表示当前已匹配的前缀长度。
-- **核心优势**：消除暴力回跳的 `while` 循环，将单步字符转移复杂度由均摊 $O(1)$ 变为严格 $O(1)$。
-- **常见应用**：数位 DP、矩阵快速幂 DP（如求解长度为 $L$ 且包含/不包含特定模式串的合法字符串数量）。
+== KMP 自动机
+将模式串 $p$ 构建为确定性有限状态自动机 (DFA)。状态 $u in [0, m]$ 表示当前已匹配的前缀长度。
+- *核心优势*：消除暴力回跳的 `while` 循环，将单步字符转移复杂度由均摊 $O(1)$ 变为严格 $O(1)$。
+- *常见应用*：数位 DP、矩阵快速幂 DP（如求解长度为 $L$ 且包含/不包含特定模式串的合法字符串数量）。
 
 ```cpp
 constexpr i32 maxn = 1000005;
@@ -1537,13 +1576,13 @@ void build_kmp_automaton(const string& p) {
 }
 ```
 
-### Border Tree (失配树)
-前缀 $i$（1-based，长度为 $i$）的最长真 border 长度为 $nxt[i]$。失配树以 0 为根，对每个 $1 \le i \le n$ 连边 $nxt[i] \to i$。
-- **核心性质**：
+== Border Tree (失配树)
+前缀 $i$（1-based，长度为 $i$）的最长真 border 长度为 $"nxt"[i]$。失配树以 0 为根，对每个 $1 <= i <= n$ 连边 $"nxt"[i] -> i$。
+- *核心性质*：
   1. 前缀 $u$ 的所有 border 长度恰好对应失配树上 $u$ 到根节点 0 的路径祖先。
-  2. 前缀 $u$ 和前缀 $v$ 的最长公共 border 对应失配树上的最近公共祖先 $\text{LCA}(u, v)$。
-  3. 前缀 $v$ 是前缀 $u$ 的 border $\iff v$ 是 $u$ 的祖先（即 $u$ 在 $v$ 的子树中）。DFS 序将子树拍平后可用树状数组/线段树高效统计。
-- **时间复杂度**：建树 $O(n)$，倍增求最长公共 border $O(\log n)$。
+  2. 前缀 $u$ 和前缀 $v$ 的最长公共 border 对应失配树上的最近公共祖先 $"LCA"(u, v)$。
+  3. 前缀 $v$ 是前缀 $u$ 的 border $<=> v$ 是 $u$ 的祖先（即 $u$ 在 $v$ 的子树中）。DFS 序将子树拍平后可用树状数组/线段树高效统计。
+- *时间复杂度*：建树 $O(n)$，倍增求最长公共 border $O(log n)$。
 
 ```cpp
 constexpr i32 maxn = 1000005;
@@ -1626,7 +1665,7 @@ struct BorderTree {
 };
 ```
 
-### Manacher
+== Manacher
 最长回文子串，返回左闭右开区间 `[start, end)`：
 ```cpp
 constexpr i32 maxn = 2000005;
@@ -1653,10 +1692,10 @@ pair<i32, i32> manacher(const string& s) {
 }
 ```
 
-### 字典树 (Trie & 01-Trie)
+== 字典树 (Trie & 01-Trie)
 包含两种核心变体：
-- **字符串 Trie**：用于前缀检索，统计完整串出现次数 `count` 与前缀出现次数 `count_prefix`。
-- **01-Trie**：按二进制位（高位到低位）存储整数，贪心走相反位实现 $O(\log V)$ 求解全局/区间最大异或对，支持动态插入与删除。
+- *字符串 Trie*：用于前缀检索，统计完整串出现次数 `count` 与前缀出现次数 `count_prefix`。
+- *01-Trie*：按二进制位（高位到低位）存储整数，贪心走相反位实现 $O(log V)$ 求解全局/区间最大异或对，支持动态插入与删除。
 
 ```cpp
 // 1. 字符串字典树 (String Trie)
@@ -1759,10 +1798,10 @@ struct Trie01 {
 };
 ```
 
-### AC 自动机 (Aho-Corasick Automaton)
+== AC 自动机 (Aho-Corasick Automaton)
 多模式串精确匹配自动机（Trie + Fail 指针 + Trie 图路径压缩）。
-- **Trie 图优化**：BFS 构建失配指针时将空转移直接指向失配节点的转移，实现单字符 $O(1)$ 状态转移。
-- **拓扑排序优化**：统计文本串中各模式串出现次数时，匹配过程仅标记经过的状态计数 `val[u]++`，扫描完毕后按 fail 树反向拓扑排序自底向上传递贡献，避免最坏 $O(|T| \times \max|P|)$ 的暴力跳 fail 退化，总时间严格 $O(|T| + \sum |P|)$。
+- *Trie 图优化*：BFS 构建失配指针时将空转移直接指向失配节点的转移，实现单字符 $O(1)$ 状态转移。
+- *拓扑排序优化*：统计文本串中各模式串出现次数时，匹配过程仅标记经过的状态计数 `val[u]++`，扫描完毕后按 fail 树反向拓扑排序自底向上传递贡献，避免最坏 $O(|T| times max|P|)$ 的暴力跳 fail 退化，总时间严格 $O(|T| + sum |P|)$。
 
 ```cpp
 constexpr i32 ac_max_nodes = 500005;
@@ -1851,17 +1890,17 @@ struct ACAutomaton {
 };
 ```
 
-### 后缀数组 (Suffix Array / SA)
+== 后缀数组 (Suffix Array / SA)
 倍增法基数排序构造后缀数组，包含 `height` 数组与 ST 表 $O(1)$ LCP 查询。
-- **数组定义**（下标统一 1-based，范围 $1 \sim n$）：
+- *数组定义*（下标统一 1-based，范围 $1 tilde n$）：
   - `sa[i]`：排名为 $i$ 的后缀起始位置。
   - `rk[i]`：从位置 $i$ 开始的后缀的字典序排名（满足 `sa[rk[i]] == i`）。
-  - `height[i]`：排名为 $i$ 与 $i - 1$ 的两后缀的最长公共前缀（$\text{LCP}(sa[i], sa[i - 1])$）。
-- **关键性质**：
-  1. $\text{LCP}(sa[i], sa[j]) = \min_{k = i + 1}^j height[k]$（假设 $i < j$），利用 ST 表预处理实现 $O(1)$ 范围最小值查询。
-  2. **本质不同子串个数**：$\frac{n(n + 1)}{2} - \sum_{i = 1}^n height[i]$。
-  3. **最长重复子串 / 出现至少 $k$ 次的最长子串**：二分答案 $len$，利用 $height[i] \ge len$ 将后缀连续分组检验。
-- **复杂度**：倍增排序 $O(n \log n)$，求 `height` $O(n)$，ST 表预处理 $O(n \log n)$，单次 LCP 查询 $O(1)$。
+  - `height[i]`：排名为 $i$ 与 $i - 1$ 的两后缀的最长公共前缀（$"LCP"("sa"[i], "sa"[i - 1])$）。
+- *关键性质*：
+  1. $"LCP"("sa"[i], "sa"[j]) = min_(k = i + 1)^j "height"[k]$（假设 $i < j$），利用 ST 表预处理实现 $O(1)$ 范围最小值查询。
+  2. *本质不同子串个数*：$frac(n(n + 1), 2) - sum_(i = 1)^n "height"[i]$。
+  3. *最长重复子串 / 出现至少 $k$ 次的最长子串*：二分答案 $"len"$，利用 $"height"[i] >= "len"$ 将后缀连续分组检验。
+- *复杂度*：倍增排序 $O(n log n)$，求 `height` $O(n)$，ST 表预处理 $O(n log n)$，单次 LCP 查询 $O(1)$。
 
 ```cpp
 constexpr i32 maxn = 1000005;
@@ -1971,18 +2010,18 @@ struct SuffixArray {
 };
 ```
 
-### 后缀自动机 (Suffix Automaton / SAM)
+== 后缀自动机 (Suffix Automaton / SAM)
 识别给定字符串所有子串的最简确定性有限状态自动机 (DFA)。
-- **空间特征**：对于长度为 $n$ 的字符串，SAM 状态节点数最多为 $2n - 1$，DAG 转移边数最多为 $3n - 4$。
-- **状态性质**：
+- *空间特征*：对于长度为 $n$ 的字符串，SAM 状态节点数最多为 $2n - 1$，DAG 转移边数最多为 $3n - 4$。
+- *状态性质*：
   - 每个状态 $u$ 代表一个 `endpos` 等价类，包含原串中若干出现位置集合完全相同的子串。
-  - $u$ 包含的子串长度连续分布在 $(len[link[u]], len[u]]$ 区间内。
+  - $u$ 包含的子串长度连续分布在 $("len"["link"[u]], "len"[u]]$ 区间内。
   - `link[u]`（Parent 树指针）指向包含 $u$ 中子串最长真后缀的状态。
-- **经典应用**：
-  1. **本质不同子串数**：$\sum_{u = 2}^{tot} (len[u] - len[link[u]])$。
-  2. **子串出现次数**：按 `len` 逆序（即 Parent 树拓扑序）自底向上传递累加 `cnt[u]`。
-  3. **最长公共子串 (LCS)**：多串在 DAG 上滑动匹配。
-- **时间与空间复杂度**：在线构造时间 $O(n)$，空间复杂度严格 $O(n)$。
+- *经典应用*：
+  1. *本质不同子串数*：$sum_(u = 2)^("tot") ("len"[u] - "len"["link"[u]])$。
+  2. *子串出现次数*：按 `len` 逆序（即 Parent 树拓扑序）自底向上传递累加 `cnt[u]`。
+  3. *最长公共子串 (LCS)*：多串在 DAG 上滑动匹配。
+- *时间与空间复杂度*：在线构造时间 $O(n)$，空间复杂度严格 $O(n)$。
 
 ```cpp
 constexpr i32 sam_max_nodes = 2000005; // 状态数最多为 2 * n - 1
@@ -2070,10 +2109,10 @@ struct SAM {
 };
 ```
 
-## 图论
+= 图论
 节点编号统一 1-based：
 
-### Dijkstra
+== Dijkstra
 ```cpp
 constexpr i32 maxn = 200005;
 constexpr i64 inf = numeric_limits<i64>::max() / 2;
@@ -2099,7 +2138,7 @@ void dijkstra(i32 st, i32 n) {
 }
 ```
 
-### SPFA
+== SPFA
 ```cpp
 constexpr i32 maxn = 200005;
 constexpr i64 inf = numeric_limits<i64>::max() / 2;
@@ -2129,7 +2168,7 @@ bool spfa(i32 st, i32 n) {
 }
 ```
 
-### Floyd
+== Floyd
 ```cpp
 constexpr i32 maxn = 505;
 constexpr i64 inf = numeric_limits<i64>::max() / 2;
@@ -2142,7 +2181,7 @@ void floyd(i32 n) {
 }
 ```
 
-### LCA
+== LCA
 倍增 LCA，1-based（0 号节点作为虚空哨兵，`dep[0] = 0`）：
 ```cpp
 constexpr i32 maxn = 200005;
@@ -2169,7 +2208,7 @@ i32 lca(i32 u, i32 v) {
     return up[u][0];
 }
 ```
-### SCC
+== SCC
 ```cpp
 vector<i32> adj[maxn],dag[maxn];
 i32 dfn[maxn],dc,low[maxn],siz[maxn],sc,scc[maxn],stk[maxn],top;
@@ -2230,8 +2269,8 @@ signed main(){
 }
 ```
 
-### 虚树 (Virtual Tree)
-对于多次询问 $k$ 个关键点且 $\sum k \le 5 \times 10^5$ 的树上问题，利用单调栈在 $O(k \log k)$ 时间内浓缩关键点及其两两 LCA，构建规模不超过 $2k$ 个节点的虚树：
+== 虚树 (Virtual Tree)
+对于多次询问 $k$ 个关键点且 $sum k <= 5 times 10^5$ 的树上问题，利用单调栈在 $O(k log k)$ 时间内浓缩关键点及其两两 LCA，构建规模不超过 $2k$ 个节点的虚树：
 - 依赖原树的 DFS 序 `dfn`、深度 `dep` 以及倍增 `LCA`。
 - 构建完成后返回虚树根节点；单次询问结束后需 $O(k)$ 清理虚树邻接表，切忌使用全局 `memset`。
 
@@ -2298,13 +2337,13 @@ i32 build_virtual_tree(vector<i32>& nodes) {
 }
 ```
 
-### 树哈希 (Tree Hash / 树同构)
+== 树哈希 (Tree Hash / 树同构)
 用于高效判定两棵树是否同构、统计本质不同子树数量等问题：
-- **原理与抗碰撞设计**：
-  - 定义有根子树哈希为子节点哈希的多重集累加：$h(u) = 1 + \sum_{v \in \text{ch}(u)} f(h(v))$，求和操作天然具有对称性（与子树遍历顺序无关）。
+- *原理与抗碰撞设计*：
+  - 定义有根子树哈希为子节点哈希的多重集累加：$h(u) = 1 + sum_(v in "ch"(u)) f(h(v))$，求和操作天然具有对称性（与子树遍历顺序无关）。
   - 混淆函数 $f(x)$ 采用 Xor-Shift 结合随机掩码 `mask`（`u64` 自然溢出），有效避免简单加法碰撞（如 $1+4 = 2+3$），且杜绝了异或哈希中相同子树互相抵消为 $0$ 的缺陷。
-- **无根树同构判定**：树的重心在同构变换下保持不变（至多 $2$ 个重心）。计算以重心为根的树哈希值，当存在两个重心时取 $\min$ 即可作为无根树的唯一标准哈希。
-- **换根 DP**：由于哈希累加操作可逆（减法即为逆元），可用换根 DP 在 $O(n)$ 时间内求得以整棵树每个节点为根时的全树哈希值。
+- *无根树同构判定*：树的重心在同构变换下保持不变（至多 $2$ 个重心）。计算以重心为根的树哈希值，当存在两个重心时取 $min$ 即可作为无根树的唯一标准哈希。
+- *换根 DP*：由于哈希累加操作可逆（减法即为逆元），可用换根 DP 在 $O(n)$ 时间内求得以整棵树每个节点为根时的全树哈希值。
 
 ```cpp
 constexpr i32 maxn = 200005;
@@ -2375,7 +2414,7 @@ u64 get_tree_hash(i32 total, i32 start = 1) {
 }
 ```
 
-### 最小生成树 (Kruskal + 并查集)
+== 最小生成树 (Kruskal + 并查集)
 ```cpp
 constexpr i32 maxn = 200005, m = 500005;
 struct Edge { i32 u, v; i64 w; } e[m];
@@ -2400,90 +2439,94 @@ i64 kruskal(i32 n, i32 num_edges) {
 }
 ```
 
-### 树上随机游走
+== 树上随机游走
 示例:
-$E_u=\Sigma_{v \in son_u} \frac{E_v}{deg_v} + \frac{E_f}{deg_f} + [u=s]$，
+$E_u=Sigma_(v in "son"_u) frac(E_v, "deg"_v) + frac(E_f, "deg"_f) + [u=s]$，
 
-$E_v=A_vE_u+B_v, v \in son_u$,
+$E_v=A_v E_u+B_v, v in "son"_u$,
 
-$E_u=\Sigma_{v \in son_u} \frac{A_vE_u+B_v}{deg_v} + \frac{E_f}{deg_f} + [u=s]$，
+$E_u=Sigma_(v in "son"_u) frac(A_v E_u+B_v, "deg"_v) + frac(E_f, "deg"_f) + [u=s]$，
 
-$E_u=\frac{1}{deg_f(1-\Sigma_{v \in son_u} \frac{A_v}{deg_v})}E_f+\frac{\Sigma_{v \in son_u} \frac{B_v}{deg_v} + [u=s]}{(1-\Sigma_{v \in son_u} \frac{A_v}{deg_v})}$，
+$E_u=frac(1, "deg"_f(1-Sigma_(v in "son"_u) frac(A_v, "deg"_v)))E_f+frac(Sigma_(v in "son"_u) frac(B_v, "deg"_v) + [u=s], (1-Sigma_(v in "son"_u) frac(A_v, "deg"_v)))$，
 
-$A_u=\frac{1}{deg_f(1-\Sigma_{v \in son_u} \frac{A_v}{deg_v})}, B_u=\frac{\Sigma_{v \in son_u} \frac{B_v}{deg_v} + [u=s]}{(1-\Sigma_{v \in son_u} \frac{A_v}{deg_v})}$。
+$A_u=frac(1, "deg"_f(1-Sigma_(v in "son"_u) frac(A_v, "deg"_v))), B_u=frac(Sigma_(v in "son"_u) frac(B_v, "deg"_v) + [u=s], (1-Sigma_(v in "son"_u) frac(A_v, "deg"_v)))$。
 
-## 数学
+= 数学
 
-### 数论函数与核心定理简述
+== 数论函数与核心定理简述
 
-#### 1. 常见数论函数及性质
-数论函数指定义域为正整数 $\mathbb{Z}^+$ 的函数。若对任意互质的 $a, b$ 满足 $f(ab) = f(a)f(b)$，称 $f$ 为**积性函数**；若对任意正整数 $a, b$ 均满足，称 $f$ 为**完全积性函数**。设 $n$ 的标准质因子分解为 $n = \prod_{i=1}^k p_i^{c_i}$：
+=== 1. 常见数论函数及性质
+数论函数指定义域为正整数 $ZZ^+$ 的函数。若对任意互质的 $a, b$ 满足 $f(a b) = f(a)f(b)$，称 $f$ 为*积性函数*；若对任意正整数 $a, b$ 均满足，称 $f$ 为*完全积性函数*。设 $n$ 的标准质因子分解为 $n = product_(i=1)^k p_i^(c_i)$：
 
-| **函数名称** | **符号与定义** | **积性** | **计算式与关键性质** |
-| --- | --- | --- | --- |
-| **元函数 / 单位元** | $\epsilon(n) = [n = 1]$ | 完全积性 | 狄利克雷卷积的单位元：$f * \epsilon = f$。 |
-| **常数函数** | $\mathbf{1}(n) = 1$ | 完全积性 | 恒等于 1 的函数。 |
-| **恒等函数** | $\text{id}(n) = n$（或 $\text{id}_k(n) = n^k$） | 完全积性 | 满足 $\text{id} * \mu = \varphi$。 |
-| **欧拉函数** | $\varphi(n) = \sum_{i=1}^n [\gcd(i, n) = 1]$ | 积性 | $\varphi(n) = n \prod_{p \mid n} (1 - \frac{1}{p}) = \prod p_i^{c_i - 1}(p_i - 1)$。<br>性质：$\sum_{d \mid n} \varphi(d) = n$（即 $\varphi * \mathbf{1} = \text{id}$）。<br>欧拉反演：$[\gcd(i, j) = 1] = \sum_{d \mid \gcd(i, j)} \mu(d)$。 |
-| **莫比乌斯函数** | $\mu(n) = \begin{cases} 1, & n = 1 \\ (-1)^k, & n = \prod_{i=1}^k p_i (无平方因子) \\ 0, & 其它 \end{cases}$ | 积性 | 核心反演性质：$\sum_{d \mid n} \mu(d) = [n = 1]$（即 $\mu * \mathbf{1} = \epsilon$）。<br>莫比乌斯反演定理：$f = g * \mathbf{1} \iff g = f * \mu$。 |
-| **约数个数函数** | $d(n) = \tau(n) = \sum_{d \mid n} 1$ | 积性 | $d(n) = \prod_{i=1}^k (c_i + 1)$。<br>卷积关系：$d = \mathbf{1} * \mathbf{1}$。 |
-| **约数和函数** | $\sigma(n) = \sigma_1(n) = \sum_{d \mid n} d$ | 积性 | $\sigma(n) = \prod_{i=1}^k \frac{p_i^{c_i + 1} - 1}{p_i - 1}$。<br>卷积关系：$\sigma = \text{id} * \mathbf{1}$。 |
+#table(
+  columns: (auto, auto, auto, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [*函数名称*], [*符号与定义*], [*积性*], [*计算式与关键性质*],
+  [*元函数 / 单位元*], [$epsilon(n) = [n = 1]$], [完全积性], [狄利克雷卷积的单位元：$f * epsilon = f$。],
+  [*常数函数*], [$bold(1)(n) = 1$], [完全积性], [恒等于 1 的函数。],
+  [*恒等函数*], [$"id"(n) = n$（或 $"id"_k(n) = n^k$）], [完全积性], [满足 $"id" * mu = phi.alt$。],
+  [*欧拉函数*], [$phi.alt(n) = sum_(i=1)^n [gcd(i, n) = 1]$], [积性], [$phi.alt(n) = n product_(p | n) (1 - frac(1, p)) = product p_i^(c_i - 1)(p_i - 1)$。 \ 性质：$sum_(d | n) phi.alt(d) = n$（即 $phi.alt * bold(1) = "id"$）。 \ 欧拉反演：$[gcd(i, j) = 1] = sum_(d | gcd(i, j)) mu(d)$。],
+  [*莫比乌斯函数*], [$mu(n) = cases(1, & n = 1, (-1)^k, & n = product_(i=1)^k p_i ("""无平方因子"""), 0, & """其它""")$], [积性], [核心反演性质：$sum_(d | n) mu(d) = [n = 1]$（即 $mu * bold(1) = epsilon$）。 \ 莫比乌斯反演定理：$f = g * bold(1) <=> g = f * mu$。],
+  [*约数个数函数*], [$d(n) = tau(n) = sum_(d | n) 1$], [积性], [$d(n) = product_(i=1)^k (c_i + 1)$。 \ 卷积关系：$d = bold(1) * bold(1)$。],
+  [*约数和函数*], [$sigma(n) = sigma_1(n) = sum_(d | n) d$], [积性], [$sigma(n) = product_(i=1)^k frac(p_i^(c_i + 1) - 1, p_i - 1)$。 \ 卷积关系：$sigma = "id" * bold(1)$。],
+)
 
-#### 2. 狄利克雷卷积体系 (Dirichlet Convolution)
+=== 2. 狄利克雷卷积体系 (Dirichlet Convolution)
 定义两个数论函数 $f, g$ 的卷积运算 $*$：
-$$(f * g)(n) = \sum_{d \mid n} f(d) g\left(\frac{n}{d}\right) = \sum_{ab = n} f(a) g(b)$$
+$ (f * g)(n) = sum_(d | n) f(d) g(frac(n, d)) = sum_(a b = n) f(a) g(b) $
 
-**代数性质**：
-1. **交换律**：$f * g = g * f$
-2. **结合律**：$(f * g) * h = f * (g * h)$
-3. **分配律**：$f * (g + h) = f * g + f * h$
-4. **单位元**：$\epsilon * f = f$
-5. **积性保持**：若 $f, g$ 均为积性函数，则 $f * g$ 亦为积性函数。
+*代数性质*：
+1. *交换律*：$f * g = g * f$
+2. *结合律*：$(f * g) * h = f * (g * h)$
+3. *分配律*：$f * (g + h) = f * g + f * h$
+4. *单位元*：$epsilon * f = f$
+5. *积性保持*：若 $f, g$ 均为积性函数，则 $f * g$ 亦为积性函数。
 
-**经典卷积恒等式关系**：
-- $\mu * \mathbf{1} = \epsilon$（莫比乌斯反演基石）
-- $\varphi * \mathbf{1} = \text{id} \iff \text{id} * \mu = \varphi$
-- $\mathbf{1} * \mathbf{1} = d$
-- $\text{id} * \mathbf{1} = \sigma$
-- $d * \mu = \mathbf{1}$
-- $\sigma * \mu = \text{id}$
+*经典卷积恒等式关系*：
+- $mu * bold(1) = epsilon$（莫比乌斯反演基石）
+- $phi.alt * bold(1) = "id" <=> "id" * mu = phi.alt$
+- $bold(1) * bold(1) = d$
+- $"id" * bold(1) = sigma$
+- $d * mu = bold(1)$
+- $sigma * mu = "id"$
 
-#### 3. 常见数论定理汇总
+=== 3. 常见数论定理汇总
 
-1. **算术基本定理（唯一分解定理）**：
-   任意大于 1 的整数 $n$ 都能被唯一分解为有限个质数的乘积：$n = \prod_{i=1}^k p_i^{c_i}$。
+1. *算术基本定理（唯一分解定理）*：
+   任意大于 1 的整数 $n$ 都能被唯一分解为有限个质数的乘积：$n = product_(i=1)^k p_i^(c_i)$。
 
-2. **裴蜀定理（Bézout's identity）**：
-   设 $a, b \in \mathbb{Z}$，方程 $ax + by = m$ 有整数解 $(x, y)$ 当且仅当 $\gcd(a, b) \mid m$。特别地，$ax + by = \gcd(a, b)$ 恒有整数解，可通过扩展欧几里得算法（`exgcd`）在 $O(\log \min(a, b))$ 内构造一组特解。
+2. *裴蜀定理（Bézout's identity）*：
+   设 $a, b in ZZ$，方程 $a x + b y = m$ 有整数解 $(x, y)$ 当且仅当 $gcd(a, b) | m$。特别地，$a x + b y = gcd(a, b)$ 恒有整数解，可通过扩展欧几里得算法（`exgcd`）在 $O(log min(a, b))$ 内构造一组特解。
 
-3. **费马小定理（Fermat's Little Theorem）**：
-   若 $p$ 为质数且 $\gcd(a, p) = 1$，则：
-   $$a^{p-1} \equiv 1 \pmod p$$
-   推论：模 $p$ 意义下 $a$ 的乘法逆元为 $a^{-1} \equiv a^{p-2} \pmod p$。
+3. *费马小定理（Fermat's Little Theorem）*：
+   若 $p$ 为质数且 $gcd(a, p) = 1$，则：
+   $ a^(p-1) equiv 1 mod p $
+   推论：模 $p$ 意义下 $a$ 的乘法逆元为 $a^(-1) equiv a^(p-2) mod p$。
 
-4. **欧拉定理（Euler's Totient Theorem）**：
-   若 $\gcd(a, m) = 1$，则：
-   $$a^{\varphi(m)} \equiv 1 \pmod m$$
+4. *欧拉定理（Euler's Totient Theorem）*：
+   若 $gcd(a, m) = 1$，则：
+   $ a^(phi.alt(m)) equiv 1 mod m $
 
-5. **扩展欧拉定理（降幂公式）**：
-   对任意底数 $a$ 与模数 $m$（**不要求互质**）：
-   $$a^b \equiv \begin{cases} a^b, & b < \varphi(m) \\ a^{b \bmod \varphi(m) + \varphi(m)}, & b \ge \varphi(m) \end{cases} \pmod m$$
+5. *扩展欧拉定理（降幂公式）*：
+   对任意底数 $a$ 与模数 $m$（*不要求互质*）：
+   $ a^b equiv cases(a^b, & b < phi.alt(m), a^(b mod phi.alt(m) + phi.alt(m)), & b >= phi.alt(m)) mod m $
    主要用于处理指数极大（以高精度字符串给出或幂塔结构）时的同余运算。
 
-6. **中国剩余定理 (CRT) 与扩展中国剩余定理 (EXCRT)**：
-   - **CRT**：求解线性同余方程组 $x \equiv r_i \pmod{m_i}$。当模数 $m_i$ 两两互质时，方程组在模 $M = \prod m_i$ 下有唯一解：$x \equiv \sum r_i M_i M_i^{-1} \pmod M$（其中 $M_i = M / m_i$）。
-   - **EXCRT**：当模数不保证互质时，利用 `exgcd` 依次两两合并方程：设当前解为 $x \equiv ans \pmod L$，新方程为 $x \equiv r \pmod m$，则等价于解 $L \cdot t \equiv r - ans \pmod m$。若无解则方程组无解，否则更新 $ans$ 与 $L \gets \text{lcm}(L, m)$。
+6. *中国剩余定理 (CRT) 与扩展中国剩余定理 (EXCRT)*：
+   - *CRT*：求解线性同余方程组 $x equiv r_i mod{m_i}$。当模数 $m_i$ 两两互质时，方程组在模 $M = product m_i$ 下有唯一解：$x equiv sum r_i M_i M_i^(-1) mod M$（其中 $M_i = M / m_i$）。
+   - *EXCRT*：当模数不保证互质时，利用 `exgcd` 依次两两合并方程：设当前解为 $x equiv "ans" mod L$，新方程为 $x equiv r mod m$，则等价于解 $L dot t equiv r - "ans" mod m$。若无解则方程组无解，否则更新 $"ans"$ 与 $L <- "lcm"(L, m)$。
 
-7. **威尔逊定理（Wilson's Theorem）**：
-   整数 $p > 1$ 是质数当且仅当 $(p - 1)! \equiv -1 \pmod p$。
+7. *威尔逊定理（Wilson's Theorem）*：
+   整数 $p > 1$ 是质数当且仅当 $(p - 1)! equiv -1 mod p$。
 
-8. **卢卡斯定理（Lucas' Theorem）**：
+8. *卢卡斯定理（Lucas' Theorem）*：
    若 $p$ 为质数，$n, m$ 为非负整数，则：
-   $$\binom{n}{m} \equiv \binom{\lfloor n/p \rfloor}{\lfloor m/p \rfloor} \binom{n \bmod p}{m \bmod p} \pmod p$$
-   用于在小质数模数 $p$（通常 $p \le 10^5$）下计算极大组合数 $\binom{n}{m}$（$n, m \le 10^{18}$）。
+   $ binom(n, m) equiv binom(floor(n/p), floor(m/p)) binom(n mod p, m mod p) mod p $
+   用于在小质数模数 $p$（通常 $p <= 10^5$）下计算极大组合数 $binom(n, m)$（$n, m <= 10^(18)$）。
 
-### 线性筛预处理积性函数 (primes, μ, φ, d)
-一次线性筛同时求质数、莫比乌斯函数 $\mu$、欧拉函数 $\varphi$、约数个数 $d$：
+== 线性筛预处理积性函数 (primes, μ, φ, d)
+一次线性筛同时求质数、莫比乌斯函数 $mu$、欧拉函数 $phi.alt$、约数个数 $d$：
 ```cpp
 constexpr i32 max_v = 1000005;
 i32 primes[max_v], minp[max_v], mu[max_v], phi[max_v], d[max_v], num[max_v], pr_cnt;
@@ -2523,22 +2566,22 @@ void init_multiplicative(i32 m = max_v - 1) {
 }
 ```
 
-### 杜教筛 (求积性函数前缀和)
-用于在 $O(n^{2/3})$ 时间复杂度内计算积性函数的前缀和 $S(n) = \sum_{i=1}^n f(i)$（例如 $n \le 10^9 \sim 10^{11}$）。
+== 杜教筛 (求积性函数前缀和)
+用于在 $O(n^(2/3))$ 时间复杂度内计算积性函数的前缀和 $S(n) = sum_(i=1)^n f(i)$（例如 $n <= 10^9 tilde 10^(11)$）。
 
-#### 核心推导公式
+=== 核心推导公式
 寻找积性函数 $g$，使得 $g$ 与 $h = f * g$ 的前缀和均易于快速计算。根据狄利克雷卷积展开：
-$$\sum_{i=1}^n (f * g)(i) = \sum_{i=1}^n \sum_{d \mid i} g(d) f\left(\frac{i}{d}\right) = \sum_{d=1}^n g(d) S\left(\left\lfloor \frac{n}{d} \right\rfloor\right)$$
+$ sum_(i=1)^n (f * g)(i) = sum_(i=1)^n sum_(d | i) g(d) f(frac(i, d)) = sum_(d=1)^n g(d) S(floor(frac(n, d))) $
 移项分离出 $d = 1$ 的项：
-$$g(1) S(n) = \sum_{i=1}^n (f * g)(i) - \sum_{d=2}^n g(d) S\left(\left\lfloor \frac{n}{d} \right\rfloor\right)$$
+$ g(1) S(n) = sum_(i=1)^n (f * g)(i) - sum_(d=2)^n g(d) S(floor(frac(n, d))) $
 
-#### 经典构造
-1. **求 $\mu$ 的前缀和**：取 $g = \mathbf{1}$，则 $\mu * \mathbf{1} = \epsilon$，得：
-   $$M(n) = 1 - \sum_{d=2}^n M\left(\left\lfloor \frac{n}{d} \right\rfloor\right)$$
-2. **求 $\varphi$ 的前缀和**：取 $g = \mathbf{1}$，则 $\varphi * \mathbf{1} = \text{id}$，得：
-   $$\Phi(n) = \frac{n(n+1)}{2} - \sum_{d=2}^n \Phi\left(\left\lfloor \frac{n}{d} \right\rfloor\right)$$
+=== 经典构造
+1. *求 $mu$ 的前缀和*：取 $g = bold(1)$，则 $mu * bold(1) = epsilon$，得：
+   $ M(n) = 1 - sum_(d=2)^n M(floor(frac(n, d))) $
+2. *求 $phi.alt$ 的前缀和*：取 $g = bold(1)$，则 $phi.alt * bold(1) = "id"$，得：
+   $ Phi(n) = frac(n(n+1), 2) - sum_(d=2)^n Phi(floor(frac(n, d))) $
 
-预处理前 $O(n^{2/3})$ 项（通常 $N \approx 2 \times 10^6$），超出部分使用哈希表（`gp_hash_table`）记忆化与数论分块加速：
+预处理前 $O(n^(2/3))$ 项（通常 $N approx 2 times 10^6$），超出部分使用哈希表（`gp_hash_table`）记忆化与数论分块加速：
 ```cpp
 #include <ext/pb_ds/assoc_container.hpp>
 using namespace __gnu_pbds;
@@ -2604,7 +2647,7 @@ i64 get_sum_phi(i64 n) {
 }
 ```
 
-### 快速幂
+== 快速幂
 ```cpp
 i64 binpow(i64 a, i64 b, i64 p) {
     i64 res = 1 % p;
@@ -2618,7 +2661,7 @@ i64 binpow(i64 a, i64 b, i64 p) {
 }
 ```
 
-### exgcd 与 模逆元
+== exgcd 与 模逆元
 ```cpp
 i64 exgcd(i64 a, i64 b, i64 &x, i64 &y) {
     if (!b) { x = 1; y = 0; return a; }
@@ -2634,8 +2677,8 @@ i64 inv(i64 a, i64 m) {
 }
 ```
 
-### 扩展中国剩余定理 (EXCRT)
-求解线性同余方程组 $x \equiv r_i \pmod{m_i}$（模数无需两两互质）：
+== 扩展中国剩余定理 (EXCRT)
+求解线性同余方程组 $x equiv r_i mod{m_i}$（模数无需两两互质）：
 ```cpp
 // 返回 {ans, lcm}; 若无解返回 {-1, -1}
 pair<i64, i64> excrt(const vector<i64>& r, const vector<i64>& m) {
@@ -2655,8 +2698,8 @@ pair<i64, i64> excrt(const vector<i64>& r, const vector<i64>& m) {
 }
 ```
 
-### 扩展欧拉定理 (降幂取模)
-计算 $a^b \pmod m$，其中指数 $b$ 以十进制字符串形式给出：
+== 扩展欧拉定理 (降幂取模)
+计算 $a^b mod m$，其中指数 $b$ 以十进制字符串形式给出：
 ```cpp
 i64 get_phi(i64 n) {
     i64 res = n;
@@ -2683,7 +2726,7 @@ i64 ex_euler_pow(i64 a, const string& b_str, i64 m) {
 }
 ```
 
-### 欧拉筛
+== 欧拉筛
 ```cpp
 constexpr i32 maxn = 10000005;
 i32 primes[maxn], minp[maxn], pr_cnt;
@@ -2715,8 +2758,8 @@ vector<pair<i32, i32>> factorize_sieve(i32 val) {
 }
 ```
 
-### 质因数分解 (Miller – Rabin 素数测试与 Pollard – Rho 因式分解)
-复杂度 $O(N^{1/4})$：
+== 质因数分解 (Miller – Rabin 素数测试与 Pollard – Rho 因式分解)
+复杂度 $O(N^(1/4))$：
 ```cpp
 inline i64 mul(i64 a, i64 b, i64 m) {
     return (i64)((u128)a * b % m);
@@ -2785,8 +2828,8 @@ vector<i64> factorize(i64 n) {
 }
 ```
 
-### Cipolla
-二次剩余解方程 $x^2 \equiv n \pmod p$：
+== Cipolla
+二次剩余解方程 $x^2 equiv n mod p$：
 ```cpp
 inline i64 power_mod(i64 a, i64 b, i64 m) {
     i64 res = 1 % m; a %= m;
@@ -2824,7 +2867,7 @@ i64 cipolla(i64 n, i64 p) {
 }
 ```
 
-### 组合数
+== 组合数
 静态全局数组预处理阶乘与逆元：
 ```cpp
 constexpr i32 mod = 1e9 + 7;
@@ -2852,8 +2895,8 @@ i64 perm(i32 n, i32 m) {
 }
 ```
 
-### 卢卡斯定理 (Lucas)
-适用于小质数模数 $p$（如 $p \le 10^5$），大 $n, m$（如 $10^{18}$）求 $\binom{n}{m} \pmod p$：
+== 卢卡斯定理 (Lucas)
+适用于小质数模数 $p$（如 $p <= 10^5$），大 $n, m$（如 $10^(18)$）求 $binom(n, m) mod p$：
 ```cpp
 i64 binom_small(i64 n, i64 m, i64 p) {
     if (n < m || m < 0) return 0;
@@ -2873,26 +2916,30 @@ i64 lucas(i64 n, i64 m, i64 p) {
 }
 ```
 
-### 卡特兰数 (Catalan)
+== 卡特兰数 (Catalan)
 
-#### 1. 核心公式与性质
-- **通项公式**：
-  $$C_n = \frac{1}{n+1} \binom{2n}{n} = \binom{2n}{n} - \binom{2n}{n-1}$$
-- **递推关系**：
-  - 线性递推：$C_0 = 1, \quad C_n = \frac{4n - 2}{n + 1} C_{n-1}$
-  - 卷积递推：$C_0 = 1, \quad C_n = \sum_{i=0}^{n-1} C_i C_{n-1-i} \quad (n \ge 1)$
-- **前若干项**：$1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, \dots$
+=== 1. 核心公式与性质
+- *通项公式*：
+  $ C_n = frac(1, n+1) binom(2n, n) = binom(2n, n) - binom(2n, n-1) $
+- *递推关系*：
+  - 线性递推：$C_0 = 1,   C_n = frac(4n - 2, n + 1) C_(n-1)$
+  - 卷积递推：$C_0 = 1,   C_n = sum_(i=0)^(n-1) C_i C_(n-1-i)   (n >= 1)$
+- *前若干项*：$1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, dots$
 
-#### 2. 常见组合模型速查
-| 模型名称 | 问题描述 | 对应结果 |
-| --- | --- | --- |
-| **括号序列** | $n$ 对左括号 `(` 和右括号 `)` 组成合法序列的方案数 | $C_n$ |
-| **栈序列** | $n$ 个不同元素按已知顺序依次入栈，出栈序列的排列数 | $C_n$ |
-| **二叉树形态** | $n$ 个节点构成的不同形态二叉树总数（或 $n+1$ 个叶子的满二叉树） | $C_n$ |
-| **多边形剖分** | 凸 $n+2$ 边形用不相交的对角线分割为三角形的方案数 | $C_n$ |
-| **Dyck 路径** | 从 $(0, 0)$ 到 $(n, n)$，每步右移或上移，不穿过直线 $y = x$ 的路径数 | $C_n$ |
-| **圆周不相交弦** | 圆周上 $2n$ 个互异点两两连线，线段互不相交的配对方案数 | $C_n$ |
-| **广义反射容斥** | 从 $(0, 0)$ 到 $(n, m)$（$n \ge m$），不越过直线 $y = x$ 的非降路径数 | $\binom{n+m}{m} - \binom{n+m}{m-1}$ |
+=== 2. 常见组合模型速查
+#table(
+  columns: (auto, 1fr, auto),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [模型名称], [问题描述], [对应结果],
+  [*括号序列*], [$n$ 对左括号 `(` 和右括号 `)` 组成合法序列的方案数], [$C_n$],
+  [*栈序列*], [$n$ 个不同元素按已知顺序依次入栈，出栈序列的排列数], [$C_n$],
+  [*二叉树形态*], [$n$ 个节点构成的不同形态二叉树总数（或 $n+1$ 个叶子的满二叉树）], [$C_n$],
+  [*多边形剖分*], [凸 $n+2$ 边形用不相交的对角线分割为三角形的方案数], [$C_n$],
+  [*Dyck 路径*], [从 $(0, 0)$ 到 $(n, n)$，每步右移或上移，不穿过直线 $y = x$ 的路径数], [$C_n$],
+  [*圆周不相交弦*], [圆周上 $2n$ 个互异点两两连线，线段互不相交的配对方案数], [$C_n$],
+  [*广义反射容斥*], [从 $(0, 0)$ 到 $(n, m)$（$n >= m$），不越过直线 $y = x$ 的非降路径数], [$binom(n+m, m) - binom(n+m, m-1)$],
+)
 
 ```cpp
 // 依赖组合数 init_comb()
@@ -2912,41 +2959,45 @@ void init_catalan(i32 m = maxn - 1) {
 }
 ```
 
-### 斯特林数 (Stirling)
+== 斯特林数 (Stirling)
 
-#### 1. 第一类斯特林数 (Stirling Numbers of the First Kind)
-- **记号与组合意义**：记作 $\begin{bmatrix} n \\ k \end{bmatrix}$ 或 $s(n, k)$，表示将 $n$ 个不同元素分成 $k$ 个非空**圆排列（环）**的方案数。
-- **递推关系**：
-  $$\begin{bmatrix} n \\ k \end{bmatrix} = \begin{bmatrix} n - 1 \\ k - 1 \end{bmatrix} + (n - 1) \begin{bmatrix} n - 1 \\ k \end{bmatrix}$$
+=== 1. 第一类斯特林数 (Stirling Numbers of the First Kind)
+- *记号与组合意义*：记作 $mat(delim: "[", n; k)$ 或 $s(n, k)$，表示将 $n$ 个不同元素分成 $k$ 个非空*圆排列（环）*的方案数。
+- *递推关系*：
+  $ mat(delim: "[", n; k) = mat(delim: "[", n - 1; k - 1) + (n - 1) mat(delim: "[", n - 1; k) $
   *解释：新元素单独成环，或插入已有某个元素的左侧（共 $n-1$ 种插法）。*
-  *边界：$\begin{bmatrix} 0 \\ 0 \end{bmatrix} = 1$，$\begin{bmatrix} n \\ 0 \end{bmatrix} = 0 \, (n > 0)$。*
-- **上升幂 / 下降幂代数性质**：
-  $$x^{\overline{n}} = x(x+1)\cdots(x+n-1) = \sum_{k=0}^n \begin{bmatrix} n \\ k \end{bmatrix} x^k$$
-  $$x^{\underline{n}} = x(x-1)\cdots(x-n+1) = \sum_{k=0}^n (-1)^{n-k} \begin{bmatrix} n \\ k \end{bmatrix} x^k$$
-- **性质求和**：$\sum_{k=0}^n \begin{bmatrix} n \\ k \end{bmatrix} = n!$
+  *边界：$mat(delim: "[", 0; 0) = 1$，$mat(delim: "[", n; 0) = 0   (n > 0)$。*
+- *上升幂 / 下降幂代数性质*：
+  $ x^(overline(n)) = x(x+1)dots(x+n-1) = sum_(k=0)^n mat(delim: "[", n; k) x^k $
+  $ x^(underline(n)) = x(x-1)dots(x-n+1) = sum_(k=0)^n (-1)^(n-k) mat(delim: "[", n; k) x^k $
+- *性质求和*：$sum_(k=0)^n mat(delim: "[", n; k) = n!$
 
-#### 2. 第二类斯特林数 (Stirling Numbers of the Second Kind)
-- **记号与组合意义**：记作 $\begin{Bmatrix} n \\ k \end{Bmatrix}$ 或 $S(n, k)$，表示将 $n$ 个不同元素放入 $k$ 个**无标号（相同）非空集合**的方案数。
-- **递推关系**：
-  $$\begin{Bmatrix} n \\ k \end{Bmatrix} = \begin{Bmatrix} n - 1 \\ k - 1 \end{Bmatrix} + k \begin{Bmatrix} n - 1 \\ k \end{Bmatrix}$$
+=== 2. 第二类斯特林数 (Stirling Numbers of the Second Kind)
+- *记号与组合意义*：记作 $mat(delim: "{", n; k)$ 或 $S(n, k)$，表示将 $n$ 个不同元素放入 $k$ 个*无标号（相同）非空集合*的方案数。
+- *递推关系*：
+  $ mat(delim: "{", n; k) = mat(delim: "{", n - 1; k - 1) + k mat(delim: "{", n - 1; k) $
   *解释：新元素自成一子集，或加入已有 $k$ 个非空子集之一。*
-  *边界：$\begin{Bmatrix} 0 \\ 0 \end{Bmatrix} = 1$，$\begin{Bmatrix} n \\ 0 \end{Bmatrix} = 0 \, (n > 0)$。*
-- **通项公式（容斥原理）**：
-  $$\begin{Bmatrix} n \\ k \end{Bmatrix} = \frac{1}{k!} \sum_{j=0}^k (-1)^{k-j} \binom{k}{j} j^n$$
-  *复杂度 $O(k \log n)$，适合 $n$ 极大、$k$ 较小的单项快速求值。*
-- **普通幂转下降幂（树/图高次幂求和核心转换）**：
-  $$x^n = \sum_{k=0}^n \begin{Bmatrix} n \\ k \end{Bmatrix} x^{\underline{k}} = \sum_{k=0}^n \begin{Bmatrix} n \\ k \end{Bmatrix} k! \binom{x}{k}$$
-- **贝尔数 (Bell)**：$B_n = \sum_{k=0}^n \begin{Bmatrix} n \\ k \end{Bmatrix}$ 表示 $n$ 个元素划分为任意个非空子集的总方案数。
+  *边界：$mat(delim: "{", 0; 0) = 1$，$mat(delim: "{", n; 0) = 0   (n > 0)$。*
+- *通项公式（容斥原理）*：
+  $ mat(delim: "{", n; k) = frac(1, k!) sum_(j=0)^k (-1)^(k-j) binom(k, j) j^n $
+  *复杂度 $O(k log n)$，适合 $n$ 极大、$k$ 较小的单项快速求值。*
+- *普通幂转下降幂（树/图高次幂求和核心转换）*：
+  $ x^n = sum_(k=0)^n mat(delim: "{", n; k) x^(underline(k)) = sum_(k=0)^n mat(delim: "{", n; k) k! binom(x, k) $
+- *贝尔数 (Bell)*：$B_n = sum_(k=0)^n mat(delim: "{", n; k)$ 表示 $n$ 个元素划分为任意个非空子集的总方案数。
 
-#### 3. 球盒模型对应速查 (Twelvefold Way 核心部分)
-| $n$ 个球 | $k$ 个盒 | 是否可空 | 对应方案数 / 公式 |
-| --- | --- | --- | --- |
-| 不同 | 相同 | 非空 | $\begin{Bmatrix} n \\ k \end{Bmatrix}$ |
-| 不同 | 不同 | 非空 | $k! \begin{Bmatrix} n \\ k \end{Bmatrix}$ |
-| 不同 | 不同 | 可空 | $k^n = \sum_{j=0}^k \binom{k}{j} j! \begin{Bmatrix} n \\ j \end{Bmatrix}$ |
-| 不同 | 相同 | 可空 | $\sum_{j=0}^k \begin{Bmatrix} n \\ j \end{Bmatrix}$（若 $k \ge n$ 则为 $B_n$） |
-| 相同 | 不同 | 非空 | $\binom{n-1}{k-1}$（隔板法） |
-| 相同 | 不同 | 可空 | $\binom{n+k-1}{k-1}$（插板法 / 隔板法） |
+=== 3. 球盒模型对应速查 (Twelvefold Way 核心部分)
+#table(
+  columns: (auto, auto, auto, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [$n$ 个球], [$k$ 个盒], [是否可空], [对应方案数 / 公式],
+  [不同], [相同], [非空], [$mat(delim: "{", n; k)$],
+  [不同], [不同], [非空], [$k! mat(delim: "{", n; k)$],
+  [不同], [不同], [可空], [$k^n = sum_(j=0)^k binom(k, j) j! mat(delim: "{", n; j)$],
+  [不同], [相同], [可空], [$sum_(j=0)^k mat(delim: "{", n; j)$（若 $k >= n$ 则为 $B_n$）],
+  [相同], [不同], [非空], [$binom(n-1, k-1)$（隔板法）],
+  [相同], [不同], [可空], [$binom(n+k-1, k-1)$（插板法 / 隔板法）],
+)
 
 ```cpp
 constexpr i32 maxs = 2005;
@@ -2979,52 +3030,56 @@ i64 stirling2_single(i64 n, i32 k) {
 }
 ```
 
-### 容斥原理与反演
+== 容斥原理与反演
 
-#### 1. 核心理论与反演模型速查
+=== 1. 核心理论与反演模型速查
 
-##### (1) 基础容斥原理
-- **并集大小（至少满足一个性质）**：
-  $$\left| \bigcup_{i=1}^n A_i \right| = \sum_{k=1}^n (-1)^{k-1} \sum_{1 \le i_1 < \dots < i_k \le n} \left| \bigcap_{j=1}^k A_{i_j} \right|$$
-- **对偶形式（都不满足 / 全集补集的交集）**：
-  $$\left| \bigcap_{i=1}^n \overline{A_i} \right| = \sum_{S \subseteq \{1, \dots, n\}} (-1)^{|S|} \left| \bigcap_{j \in S} A_j \right|$$
+==== (1) 基础容斥原理
+- *并集大小（至少满足一个性质）*：
+  $ abs(union_(i=1)^n A_i) = sum_(k=1)^n (-1)^(k-1) sum_(1 <= i_1 < dots < i_k <= n) abs(inter_(j=1)^k A_(i_j)) $
+- *对偶形式（都不满足 / 全集补集的交集）*：
+  $ abs(inter_(i=1)^n overline(A_i)) = sum_(S subset.eq \{1, dots, n\)} (-1)^(|S|) abs(inter_(j in S) A_j) $
   *口诀：奇加偶减（求并集） / 奇减偶加（求全不满足）。*
 
-##### (2) 错排问题 (Derangement)
+==== (2) 错排问题 (Derangement)
 $n$ 个元素的全排列中，每个元素都不在原位置上的排列数 $D_n$：
-- **递推式**：$D_0 = 1, \quad D_1 = 0, \quad D_n = (n - 1)(D_{n-1} + D_{n-2}) \quad (n \ge 2)$
-- **通项式**：$D_n = n! \sum_{k=0}^n \frac{(-1)^k}{k!}$
-- **恰好 $k$ 个在原位**：$\binom{n}{k} D_{n-k}$
+- *递推式*：$D_0 = 1,   D_1 = 0,   D_n = (n - 1)(D_(n-1) + D_(n-2))   (n >= 2)$
+- *通项式*：$D_n = n! sum_(k=0)^n frac((-1)^k, k!)$
+- *恰好 $k$ 个在原位*：$binom(n, k) D_(n-k)$
 
-##### (3) 二项式反演 (Binomial Inversion)
-- **形式一（至多 vs 恰好）**：
-  $$f(n) = \sum_{i=0}^n \binom{n}{i} g(i) \iff g(n) = \sum_{i=0}^n (-1)^{n-i} \binom{n}{i} f(i)$$
-- **形式二（至少/钦定 vs 恰好，竞赛最高频！）**：
-  $$f(k) = \sum_{i=k}^n \binom{i}{k} g(i) \iff g(k) = \sum_{i=k}^n (-1)^{i-k} \binom{i}{k} f(i)$$
-  *思维模型：$f(k)$ 表示**钦定（至少）**选择 $k$ 个条件成立、其余随意搭配的方案数（极易计算）；反演后 $g(k)$ 为**恰好**有 $k$ 个条件成立的精确方案数。特别地，$g(0) = \sum_{i=0}^n (-1)^i f(i)$。*
+==== (3) 二项式反演 (Binomial Inversion)
+- *形式一（至多 vs 恰好）*：
+  $ f(n) = sum_(i=0)^n binom(n, i) g(i) <=> g(n) = sum_(i=0)^n (-1)^(n-i) binom(n, i) f(i) $
+- *形式二（至少/钦定 vs 恰好，竞赛最高频！）*：
+  $ f(k) = sum_(i=k)^n binom(i, k) g(i) <=> g(k) = sum_(i=k)^n (-1)^(i-k) binom(i, k) f(i) $
+  *思维模型：$f(k)$ 表示*钦定（至少）*选择 $k$ 个条件成立、其余随意搭配的方案数（极易计算）；反演后 $g(k)$ 为*恰好*有 $k$ 个条件成立的精确方案数。特别地，$g(0) = sum_(i=0)^n (-1)^i f(i)$。*
 
-##### (4) Min-Max 容斥与期望扩展
-- **集合形式**：
-  $$\max(S) = \sum_{T \subseteq S, T \ne \emptyset} (-1)^{|T|-1} \min(T), \qquad \min(S) = \sum_{T \subseteq S, T \ne \emptyset} (-1)^{|T|-1} \max(T)$$
-- **期望形式（全收集/全到达模型）**：
-  $$\mathbb{E}[\max(S)] = \sum_{T \subseteq S, T \ne \emptyset} (-1)^{|T|-1} \mathbb{E}[\min(T)]$$
-  *核心优势：求解所有事件都发生的期望时间 $\mathbb{E}[\max(S)]$ 很难，但集合 $T$ 中**首个事件发生**的期望时间 $\mathbb{E}[\min(T)]$ 往往极其简单（如几何分布的 $\frac{1}{\sum_{i \in T} p_i}$）。*
-- **扩展 $k$-th Min-Max 容斥（第 $k$ 大值）**：
-  $$\text{kth-max}(S) = \sum_{T \subseteq S, T \ne \emptyset} (-1)^{|T|-k} \binom{|T|-1}{k-1} \min(T)$$
+==== (4) Min-Max 容斥与期望扩展
+- *集合形式*：
+  $ max(S) = sum_(T subset.eq S, T != emptyset) (-1)^(|T|-1) min(T),   min(S) = sum_(T subset.eq S, T != emptyset) (-1)^(|T|-1) max(T) $
+- *期望形式（全收集/全到达模型）*：
+  $ bb(E)[max(S)] = sum_(T subset.eq S, T != emptyset) (-1)^(|T|-1) bb(E)[min(T)] $
+  *核心优势：求解所有事件都发生的期望时间 $bb(E)[max(S)]$ 很难，但集合 $T$ 中*首个事件发生*的期望时间 $bb(E)[min(T)]$ 往往极其简单（如几何分布的 $frac(1, sum_(i in T) p_i)$）。*
+- *扩展 $k$-th Min-Max 容斥（第 $k$ 大值）*：
+  $ "kth-max"(S) = sum_(T subset.eq S, T != emptyset) (-1)^(|T|-k) binom(|T|-1, k-1) min(T) $
 
-##### (5) 高维前缀和与子集反演 (SOS DP / FMT)
-- **子集和与子集反演**：
-  $$f(S) = \sum_{T \subseteq S} g(T) \iff g(S) = \sum_{T \subseteq S} (-1)^{|S| - |T|} f(T)$$
+==== (5) 高维前缀和与子集反演 (SOS DP / FMT)
+- *子集和与子集反演*：
+  $ f(S) = sum_(T subset.eq S) g(T) <=> g(S) = sum_(T subset.eq S) (-1)^(|S| - |T|) f(T) $
 - 可在 $O(n 2^n)$ 时间内用高维前缀和（SOS DP）实现快速正逆变换。
 
-#### 2. 常见竞赛场景速查
-| 场景模型 | 核心解法思路 |
-| --- | --- |
-| **小集合属性限制 ($n \le 20$)** | 状压枚举子集 $mask \in [1, 2^n-1]$，按 `__builtin_parity(mask)` 分配正负符号。 |
-| **区间与 $k$ 个数互质的数的个数** | 质因数分解后，容斥求能被某些质因子整除的数的个数。 |
-| **网格走步避开障碍点** | 障碍点按坐标排序后 DP，容斥掉途径至少一个障碍点的方案数。 |
-| **“至少/恰好”类计数题** | 构造钦定模型求 $f(k) = \binom{n}{k} \times \dots$，再通过二项式反演得到恰好解 $g(k)$。 |
-| **按位与/或卷积 (AND/OR Convolution)** | 利用 FMT（高维前缀和/后缀和）在 $O(n 2^n)$ 内快速求解。 |
+=== 2. 常见竞赛场景速查
+#table(
+  columns: (auto, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [场景模型], [核心解法思路],
+  [*小集合属性限制 ($n <= 20$)*], [状压枚举子集 $"mask" in [1, 2^n-1]$，按 `__builtin_parity(mask)` 分配正负符号。],
+  [*区间与 $k$ 个数互质的数的个数*], [质因数分解后，容斥求能被某些质因子整除的数的个数。],
+  [*网格走步避开障碍点*], [障碍点按坐标排序后 DP，容斥掉途径至少一个障碍点的方案数。],
+  [*“至少/恰好”类计数题*], [构造钦定模型求 $f(k) = binom(n, k) times dots$，再通过二项式反演得到恰好解 $g(k)$。],
+  [*按位与/或卷积 (AND/OR Convolution)*], [利用 FMT（高维前缀和/后缀和）在 $O(n 2^n)$ 内快速求解。],
+)
 
 ```cpp
 // ----------------- 1. 错排预处理 O(N) -----------------
@@ -3106,7 +3161,7 @@ void sos_subset_diff(vector<i64>& a, i32 n) {
 }
 ```
 
-### 线性基
+== 线性基
 静态全局数组，无类封装：
 ```cpp
 constexpr i32 b = 62;
@@ -3172,8 +3227,8 @@ i64 query_kth(i64 k) {
 }
 ```
 
-## Tricks
-### 对拍
+= Tricks
+== 对拍
 ```bash
 cnt=0
 g++ -O2 -std=c++20  -g gen.cpp -o gen || exit 1
@@ -3201,26 +3256,30 @@ while true; do
 done
 ```
 
-### 二进制操作与位运算技巧 (C++20 <bit> & GCC Builtins)
-**`__builtin_clz(0)` 和 `__builtin_ctz(0)` 是未定义行为**。
+== 二进制操作与位运算技巧 (C++20 `<bit>` & GCC Builtins)
+*`__builtin_clz(0)` 和 `__builtin_ctz(0)` 是未定义行为*。
 
-#### 常用位运算函数速查表
-| 操作功能 | C++20 `<bit>` | GCC Builtin | 说明与边界行为 |
-| :--- | :--- | :--- | :--- |
-| 计算 1 的个数 | `popcount(x)` | `__builtin_popcount(x)` / `ll` | 统计二进制中置 1 的位数 |
-| 前导 0 个数 (clz) | `countl_zero(x)` | `__builtin_clz(x)` / `ll` | `<bit>` 在 $x=0$ 时返回位数 (32/64)；GCC 在 $x=0$ 为 **UB** |
-| 末尾 0 个数 (ctz) | `countr_zero(x)` | `__builtin_ctz(x)` / `ll` | `<bit>` 在 $x=0$ 时返回位数 (32/64)；GCC 在 $x=0$ 为 **UB** |
-| 前导 1 个数 | `countl_one(x)` | - | 从最高位开始连续 1 的个数 |
-| 末尾 1 个数 | `countr_one(x)` | - | 从最低位开始连续 1 的个数 |
-| 最小所需二进制位数 | `bit_width(x)` | - | 即 $\lfloor \log_2 x \rfloor + 1$，$x=0$ 时安全返回 0 |
-| 判断是否为 2 的幂 | `has_single_bit(x)` | - | 等价于 `x > 0 && (x & (x - 1)) == 0` |
-| 向上取最近 2 的幂 | `bit_ceil(x)` | - | 满足 $\ge x$ 的最小 2 的幂（注意避免越界） |
-| 向下取最近 2 的幂 | `bit_floor(x)` | - | 满足 $\le x$ 的最大 2 的幂 |
-| 循环左移 / 循环右移 | `rotl(x, s)` / `rotr(x, s)` | - | 将无符号整数 $x$ 循环移位 $s$ 位 |
-| 奇偶校验 (Parity) | - | `__builtin_parity(x)` / `ll` | 1 的个数模 2 的值（奇数返回 1，偶数返回 0） |
-| 首个 1 的位置 | - | `__builtin_ffs(x)` / `ll` | 1-based 返回最低位 1 的序号；$x=0$ 时返回 0 |
+=== 常用位运算函数速查表
+#table(
+  columns: (auto, auto, auto, 1fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [操作功能], [C++20 `<bit>`], [GCC Builtin], [说明与边界行为],
+  [计算 1 的个数], [`popcount(x)`], [`__builtin_popcount(x)` / `ll`], [统计二进制中置 1 的位数],
+  [前导 0 个数 (clz)], [`countl_zero(x)`], [`__builtin_clz(x)` / `ll`], [`<bit>` 在 $x=0$ 时返回位数 (32/64)；GCC 在 $x=0$ 为 *UB*],
+  [末尾 0 个数 (ctz)], [`countr_zero(x)`], [`__builtin_ctz(x)` / `ll`], [`<bit>` 在 $x=0$ 时返回位数 (32/64)；GCC 在 $x=0$ 为 *UB*],
+  [前导 1 个数], [`countl_one(x)`], [-], [从最高位开始连续 1 的个数],
+  [末尾 1 个数], [`countr_one(x)`], [-], [从最低位开始连续 1 的个数],
+  [最小所需二进制位数], [`bit_width(x)`], [-], [即 $floor(log_2 x) + 1$，$x=0$ 时安全返回 0],
+  [判断是否为 2 的幂], [`has_single_bit(x)`], [-], [等价于 `x > 0 && (x & (x - 1)) == 0`],
+  [向上取最近 2 的幂], [`bit_ceil(x)`], [-], [满足 $>= x$ 的最小 2 的幂（注意避免越界）],
+  [向下取最近 2 的幂], [`bit_floor(x)`], [-], [满足 $<= x$ 的最大 2 的幂],
+  [循环左移 / 循环右移], [`rotl(x, s)` / `rotr(x, s)`], [-], [将无符号整数 $x$ 循环移位 $s$ 位],
+  [奇偶校验 (Parity)], [-], [`__builtin_parity(x)` / `ll`], [1 的个数模 2 的值（奇数返回 1，偶数返回 0）],
+  [首个 1 的位置], [-], [`__builtin_ffs(x)` / `ll`], [1-based 返回最低位 1 的序号；$x=0$ 时返回 0],
+)
 
-#### 高频位运算技巧与集合遍历
+=== 高频位运算技巧与集合遍历
 ```cpp
 // 1. 基础位操作宏/函数
 template <typename T> constexpr T lowbit(T x) { return x & -x; }
@@ -3254,18 +3313,18 @@ void gospers_hack(i32 n, i32 k) {
 }
 ```
 
-### 标准库与 GCC 常用函数 (STL Utilities & Pragmas)
+== 标准库与 GCC 常用函数 (STL Utilities & Pragmas)
 
-- **GCC 指令 (Pragmas)**：
+- *GCC 指令 (Pragmas)*：
   ```cpp
   #pragma GCC optimize("O3,unroll-loops")
   #pragma GCC target("avx2,bmi,bmi2,lzcnt,popcnt")
   ```
-- **GCC 内置安全溢出检测**：
+- *GCC 内置安全溢出检测*：
   `__builtin_add_overflow(a, b, &res)` 与 `__builtin_mul_overflow(a, b, &res)`：返回布尔值指示是否发生有符号/无符号整数溢出。
-- **`<algorithm>` & `<numeric>` 核心函数**：
+- *`<algorithm>` & `<numeric>` 核心函数*：
   - `nth_element(first, nth, last)`：$O(n)$ 线性时间将第 $k$ 小的元素置于 `nth` 位置，求中位数/快速划分神器。
-  - `lower_bound` / `upper_bound`：二分查找首个 $\ge$ 或 $>$ 目标值的迭代器位置。
+  - `lower_bound` / `upper_bound`：二分查找首个 $>=$ 或 $>$ 目标值的迭代器位置。
   - `next_permutation` / `prev_permutation`：按字典序生成全排列。
   - `std::iota(first, last, val)`：顺序递增填充，常用于并查集 `iota(fa, fa + n, 0)` 或排列下标初始化。
   - `std::gcd` / `std::lcm`：C++17 引入，编译期 `constexpr` 求最大公约数与最小公倍数。
@@ -3302,7 +3361,7 @@ void stl_and_builtins_demo() {
 }
 ```
 
-### DFS 栈模拟
+== DFS 栈模拟
 ```cpp
 constexpr i32 maxn = 100005;
 vector<i32> adj[maxn];
@@ -3351,10 +3410,10 @@ void dfs_stack(i32 root) {
 }
 ```
 
-### pb_ds
+== pb_ds
 引自 [https://www.cnblogs.com/ofnoname/p/18958700](https://www.cnblogs.com/ofnoname/p/18958700)
 
-#### 关联容器
+=== 关联容器
 ```cpp
 #include <ext/pb_ds/assoc_container.hpp>
 using namespace __gnu_pbds;
@@ -3372,7 +3431,7 @@ void demo_hash() {
 }
 ```
 
-#### 有序容器 (平衡树)
+=== 有序容器 (平衡树)
 ```cpp
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/tree_policy.hpp>
@@ -3396,7 +3455,7 @@ void demo_tree() {
 }
 ```
 
-#### 优先队列 (可并堆)
+=== 优先队列 (可并堆)
 ```cpp
 #include <ext/pb_ds/priority_queue.hpp>
 using namespace __gnu_pbds;
@@ -3420,7 +3479,7 @@ void demo_heap() {
 }
 ```
 
-#### 字典树
+=== 字典树
 ```cpp
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/trie_policy.hpp>
@@ -3441,7 +3500,7 @@ void demo_trie() {
 }
 ```
 
-#### 自定义哈希与节点策略
+=== 自定义哈希与节点策略
 ```cpp
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/tree_policy.hpp>
@@ -3480,9 +3539,9 @@ void demo_custom() {
 }
 ```
 
-### 程序计时 (Timer & Time Limiting)
-- **高精度计时器**：基于现代 C++ `std::chrono::steady_clock`（单调递增，纳秒精度，不受系统改表影响）。提供 RAII 风格作用域计时器，析构时自动输出耗时（ms）。
-- **算法卡时 (Time Limiting)**：在模拟退火、随机化算法或暴搜中，设定时间阈值（如 $0.95$ 秒）尽可能多地执行迭代。相比 `clock()`，`chrono::steady_clock` 在各大评测机与跨平台环境下具有更稳定的行为。
+== 程序计时 (Timer & Time Limiting)
+- *高精度计时器*：基于现代 C++ `std::chrono::steady_clock`（单调递增，纳秒精度，不受系统改表影响）。提供 RAII 风格作用域计时器，析构时自动输出耗时（ms）。
+- *算法卡时 (Time Limiting)*：在模拟退火、随机化算法或暴搜中，设定时间阈值（如 $0.95$ 秒）尽可能多地执行迭代。相比 `clock()`，`chrono::steady_clock` 在各大评测机与跨平台环境下具有更稳定的行为。
 
 ```cpp
 // 1. RAII 高精度计时器 (可测量局部函数/代码块运行时间)
@@ -3515,7 +3574,7 @@ void time_limit_demo() {
 }
 ```
 
-### 随机数据生成与对拍框架 (Data Generator & Stress Testing)
+== 随机数据生成与对拍框架 (Data Generator & Stress Testing)
 提供基于 `mt19937_64` 的完整随机数据生成器与跨平台对拍脚本。
 
 ```cpp
@@ -3590,8 +3649,8 @@ struct Random {
 } rnd;
 ```
 
-#### 对拍框架 (C++ 内置对拍 / 跨平台 Shell)
-- **C++ 内置对拍循环**：
+=== 对拍框架 (C++ 内置对拍 / 跨平台 Shell)
+- *C++ 内置对拍循环*：
 ```cpp
 // duipai.cpp: 将 gen, sol, std 编译为可执行文件后直接运行
 int main() {
@@ -3609,7 +3668,7 @@ int main() {
     return 0;
 }
 ```
-- **PowerShell / Bash 对拍单行命令**：
+- *PowerShell / Bash 对拍单行命令*：
   - Windows PowerShell:
     ```powershell
     for ($i=1; $i -le 1000; $i++) { .\gen > in.txt; .\sol < in.txt > out.txt; .\std < in.txt > ans.txt; if (Compare-Object (Get-Content out.txt) (Get-Content ans.txt)) { Write-Host "WA on $i"; break } else { Write-Host "AC on $i" } }
@@ -3618,4 +3677,3 @@ int main() {
     ```bash
     for ((i=1;i<=1000;i++)); do ./gen > in.txt; ./sol < in.txt > out.txt; ./std < in.txt > ans.txt; diff -b out.txt ans.txt || { echo "WA on $i"; break; }; echo "AC on $i"; done
     ```
-
