@@ -1619,6 +1619,85 @@ struct BorderTree {
 };
 ```
 
+== 扩展 KMP (Z 函数 / EXKMP)
+求解字符串自身的各后缀与原串的最长公共前缀（Z 函数），以及模式串与文本串各后缀的最长公共前缀（EXKMP），下标统一 0-based。
+- *数组定义*：
+  - `z[i]`：$s[i dots n - 1]$ 与原串 $s$ 的 LCP 长度，即 $z[i] = "LCP"(s, s[i dots n - 1])$（通常规定 $z[0] = n$）。
+  - `ext[i]`：文本串后缀 $s[i dots n - 1]$ 与模式串 $p$ 的 LCP 长度，即 $"ext"[i] = "LCP"(p, s[i dots n - 1])$。
+- *核心思想*：
+  维护已知匹配中右端点最靠右的匹配区间 $[l, r]$（满足 $s[l dots r] = s[0 dots r - l]$ 且 $r$ 最大）。
+  - 若 $i <= r$，由对称性可知 $s[i dots r]$ 对应前缀子串 $s[i - l dots r - l]$，继承初始长度 $min(r - i + 1, z[i - l])$；若超出 $r$ 则继续向后暴力比对并更新 $[l, r]$。
+  - 若 $i > r$，直接从 $i$ 开始向后比对并更新 $[l, r]$。
+  - 模式匹配计算 $"ext"$ 数组逻辑完全一致，利用模式串预处理的 $z$ 数组跳跃比对。
+- *经典应用*：
+  1. *模式串匹配*：$"ext"[i] == m <=> s[i dots i + m - 1] == p$（模式串 $p$ 长度为 $m$）。
+  2. *Border 判定*：$s$ 存在长度为 $k$ 的 border $<=> z[n - k] == k$。
+  3. *周期与循环节*：若 $k divides n$ 且 $z[k] == n - k$，则 $k$ 为 $s$ 的周期；最小周期为满足条件的最小 $k$。
+  4. *串拼接技巧*：构造 $p + \# + s$（$\#$ 不属于字符集），直接对其求 Z 函数，后半部分即对应各位置匹配长度。
+- *时间与空间复杂度*：右端点 $r$ 严格单调不减，均摊时间复杂度为严格 $O(n + m)$，空间复杂度 $O(n + m)$。
+
+```cpp
+// 1. 静态数组版本 (经典 EXKMP，适用于海量数据与多组匹配)
+constexpr i32 maxn = 1000005;
+i32 z[maxn];
+i32 ext[maxn];
+
+// 计算自身 Z 函数: z[i] = LCP(s, s[i...n-1])，其中 z[0] = n
+void build_z(const string& s) {
+    i32 n = sz(s);
+    if (n == 0) return;
+    z[0] = n;
+    i32 l = 0, r = -1;
+    rep(i, 1, n) {
+        if (i <= r) z[i] = min(r - i + 1, z[i - l]);
+        else z[i] = 0;
+        while (i + z[i] < n && s[z[i]] == s[i + z[i]]) ++z[i];
+        if (i + z[i] - 1 > r) {
+            l = i;
+            r = i + z[i] - 1;
+        }
+    }
+}
+
+// 扩展 KMP: 计算 ext[i] = LCP(p, s[i...n-1])，返回完全匹配的起始下标 (0-based)
+vector<i32> exkmp(const string& s, const string& p) {
+    build_z(p);
+    i32 n = sz(s), m = sz(p);
+    vector<i32> matches;
+    if (n == 0 || m == 0) return matches;
+    i32 l = 0, r = -1;
+    rep(i, 0, n) {
+        if (i <= r) ext[i] = min(r - i + 1, z[i - l]);
+        else ext[i] = 0;
+        while (i + ext[i] < n && ext[i] < m && s[i + ext[i]] == p[ext[i]]) ++ext[i];
+        if (i + ext[i] - 1 > r) {
+            l = i;
+            r = i + ext[i] - 1;
+        }
+        if (ext[i] == m) matches.push_back(i);
+    }
+    return matches;
+}
+
+// 2. 动态 vector 紧凑写法 (单串 Z 函数开箱即用)
+vector<i32> z_func(const string& s) {
+    i32 n = sz(s);
+    vector<i32> zf(n);
+    if (n == 0) return zf;
+    zf[0] = n;
+    i32 l = 0, r = -1;
+    rep(i, 1, n) {
+        if (i <= r) zf[i] = min(r - i + 1, zf[i - l]);
+        while (i + zf[i] < n && s[zf[i]] == s[i + zf[i]]) ++zf[i];
+        if (i + zf[i] - 1 > r) {
+            l = i;
+            r = i + zf[i] - 1;
+        }
+    }
+    return zf;
+}
+```
+
 == Manacher
 最长回文子串，返回左闭右开区间 `[start, end)`：
 ```cpp
