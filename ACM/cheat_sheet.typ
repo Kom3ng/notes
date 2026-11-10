@@ -118,87 +118,67 @@ void example_bound() {
 
 == 高精度
 ```cpp
-constexpr i32 base = 1e9;
-
-struct BigInt {
-    vector<i32> d;
+// 继承 vector<i32> 的十进制高精，好背好写，省去压位切片与格式化补零
+struct BigInt : vector<i32> {
     BigInt(i64 v = 0) {
-        if (!v) d.push_back(0);
-        while (v > 0) { d.push_back(v % base); v /= base; }
+        if (!v) push_back(0);
+        for (; v; v /= 10) push_back(v % 10);
     }
     BigInt(const string& s) {
-        d.clear();
-        for (i32 i = sz(s); i > 0; i -= 9)
-            d.push_back(stoi(s.substr(max(0, i - 9), min(i, 9))));
-        trim();
+        for (i32 i = sz(s) - 1; i >= 0; --i) push_back(s[i] - '0');
     }
-    void trim() { while (sz(d) > 1 && !d.back()) d.pop_back(); }
-    bool operator<(const BigInt& o) const {
-        if (sz(d) != sz(o.d)) return sz(d) < sz(o.d);
-        for (i32 i = sz(d) - 1; i >= 0; --i)
-            if (d[i] != o.d[i]) return d[i] < o.d[i];
+    void trim() { while (sz(*this) > 1 && !back()) pop_back(); }
+
+    bool operator==(const BigInt& b) const = default;
+    bool operator<(const BigInt& b) const {
+        if (sz(*this) != sz(b)) return sz(*this) < sz(b);
+        for (i32 i = sz(*this) - 1; i >= 0; --i)
+            if ((*this)[i] != b[i]) return (*this)[i] < b[i];
         return false;
     }
-    bool operator==(const BigInt& o) const { return d == o.d; }
-    bool operator<=(const BigInt& o) const { return *this < o || *this == o; }
-    BigInt operator+(const BigInt& o) const {
-        BigInt res; res.d.clear(); i64 c = 0;
-        rep(i, 0, max(sz(d), sz(o.d))) {
-            if (i < sz(d)) c += d[i];
-            if (i < sz(o.d)) c += o.d[i];
-            res.d.push_back(c % base); c /= base;
+    BigInt operator+(const BigInt& b) const {
+        BigInt c; c.clear(); i32 t = 0;
+        for (i32 i = 0; i < sz(*this) || i < sz(b) || t; ++i) {
+            if (i < sz(*this)) t += (*this)[i];
+            if (i < sz(b)) t += b[i];
+            c.push_back(t % 10); t /= 10;
         }
-        if (c) res.d.push_back(c);
-        return res;
+        return c;
     }
-    BigInt operator-(const BigInt& o) const { // 默认 *this >= o
-        BigInt res = *this; i64 c = 0;
-        rep(i, 0, sz(res.d)) {
-            res.d[i] -= c + (i < sz(o.d) ? o.d[i] : 0);
-            if (res.d[i] < 0) { res.d[i] += base; c = 1; }
-            else c = 0;
+    BigInt operator-(const BigInt& b) const { // 默认 *this >= b
+        BigInt c = *this;
+        rep(i, 0, sz(c)) {
+            if (i < sz(b)) c[i] -= b[i];
+            if (c[i] < 0) { c[i] += 10; c[i + 1]--; }
         }
-        res.trim(); return res;
+        c.trim(); return c;
     }
-    BigInt operator*(i64 v) const {
-        BigInt res; res.d.clear(); i64 c = 0;
-        rep(i, 0, sz(d)) {
-            c += d[i] * v;
-            res.d.push_back(c % base); c /= base;
+    BigInt operator*(const BigInt& b) const {
+        BigInt c; c.assign(sz(*this) + sz(b), 0);
+        rep(i, 0, sz(*this)) rep(j, 0, sz(b)) c[i + j] += (*this)[i] * b[j];
+        rep(i, 0, sz(c) - 1) {
+            c[i + 1] += c[i] / 10; c[i] %= 10;
         }
-        while (c) { res.d.push_back(c % base); c /= base; }
-        res.trim(); return res;
-    }
-    BigInt operator*(const BigInt& o) const {
-        BigInt res; res.d.assign(sz(d) + sz(o.d), 0);
-        rep(i, 0, sz(d)) {
-            i64 c = 0;
-            rep(j, 0, sz(o.d)) {
-                i64 cur = res.d[i + j] + 1LL * d[i] * o.d[j] + c;
-                res.d[i + j] = cur % base; c = cur / base;
-            }
-            if (c) res.d[i + sz(o.d)] += c;
-        }
-        res.trim(); return res;
+        c.trim(); return c;
     }
     pair<BigInt, i64> divmod(i64 v) const {
-        BigInt q; q.d.resize(sz(d)); i64 r = 0;
-        for (i32 i = sz(d) - 1; i >= 0; --i) {
-            i64 cur = d[i] + r * base;
-            q.d[i] = cur / v; r = cur % v;
+        BigInt c; c.clear(); i64 r = 0;
+        for (i32 i = sz(*this) - 1; i >= 0; --i) {
+            r = r * 10 + (*this)[i];
+            c.push_back(r / v); r %= v;
         }
-        q.trim(); return {q, r};
+        reverse(all(c));
+        c.trim(); return {c, r};
     }
     BigInt operator/(i64 v) const { return divmod(v).first; }
     i64 operator%(i64 v) const { return divmod(v).second; }
-};
 
-istream& operator>>(istream& is, BigInt& v) { string s; if (is >> s) v = BigInt(s); return is; }
-ostream& operator<<(ostream& os, const BigInt& v) {
-    os << (v.d.empty() ? 0 : v.d.back());
-    for (i32 i = sz(v.d) - 2; i >= 0; --i) os << setfill('0') << setw(9) << v.d[i];
-    return os;
-}
+    friend istream& operator>>(istream& is, BigInt& a) { string s; if (is >> s) a = s; return is; }
+    friend ostream& operator<<(ostream& os, const BigInt& a) {
+        for (i32 i = sz(a) - 1; i >= 0; --i) os << a[i];
+        return os;
+    }
+};
 ```
 
 == 网络流
@@ -1345,50 +1325,24 @@ signed main(){
 ```
 
 == 分数类
-紧凑分数结构体，利用 `i128` 安全跨乘比较：
+极简手写分数类，利用 `i128` 构造化简与跨乘比较，省去繁冗重载并防止中间溢出：
 ```cpp
 struct Frac {
     i64 num, den;
-    constexpr void norm() {
-        if (!den) return;
-        if (den < 0) { num = -num; den = -den; }
-        i64 g = std::gcd(abs(num), den);
-        if (g) { num /= g; den /= g; }
+    Frac(i128 n = 0, i128 d = 1) {
+        if (d < 0) n = -n, d = -d;
+        i128 g = std::gcd(n, d);
+        num = n / g; den = d / g;
     }
-    constexpr Frac(i64 n = 0, i64 d = 1) : num(n), den(d) { norm(); }
-    constexpr Frac operator-() const { return {-num, den}; }
-    constexpr Frac& operator+=(const Frac& o) {
-        i64 g = std::gcd(den, o.den);
-        num = num * (o.den / g) + o.num * (den / g);
-        den = (den / g) * o.den;
-        norm(); return *this;
-    }
-    constexpr Frac& operator-=(const Frac& o) {
-        i64 g = std::gcd(den, o.den);
-        num = num * (o.den / g) - o.num * (den / g);
-        den = (den / g) * o.den;
-        norm(); return *this;
-    }
-    constexpr Frac& operator*=(const Frac& o) {
-        i64 g1 = std::gcd(abs(num), o.den), g2 = std::gcd(den, abs(o.num));
-        num = (num / g1) * (o.num / g2);
-        den = (den / g2) * (o.den / g1);
-        norm(); return *this;
-    }
-    constexpr Frac& operator/=(const Frac& o) { return *this *= Frac(o.den, o.num); }
-    friend constexpr Frac operator+(Frac a, const Frac& b) { return a += b; }
-    friend constexpr Frac operator-(Frac a, const Frac& b) { return a -= b; }
-    friend constexpr Frac operator*(Frac a, const Frac& b) { return a *= b; }
-    friend constexpr Frac operator/(Frac a, const Frac& b) { return a /= b; }
-    friend constexpr bool operator==(const Frac& a, const Frac& b) { return a.num == b.num && a.den == b.den; }
-    friend constexpr bool operator!=(const Frac& a, const Frac& b) { return !(a == b); }
-    friend constexpr bool operator<(const Frac& a, const Frac& b) { return (i128)a.num * b.den < (i128)b.num * a.den; }
-    friend constexpr bool operator>(const Frac& a, const Frac& b) { return b < a; }
-    friend constexpr bool operator<=(const Frac& a, const Frac& b) { return !(b < a); }
-    friend constexpr bool operator>=(const Frac& a, const Frac& b) { return !(a < b); }
-    friend ostream& operator<<(ostream& os, const Frac& f) {
-        if (f.den == 1) return os << f.num;
-        return os << f.num << "/" << f.den;
+    Frac operator+(Frac o) const { return {(i128)num * o.den + (i128)o.num * den, (i128)den * o.den}; }
+    Frac operator-(Frac o) const { return {(i128)num * o.den - (i128)o.num * den, (i128)den * o.den}; }
+    Frac operator*(Frac o) const { return {(i128)num * o.num, (i128)den * o.den}; }
+    Frac operator/(Frac o) const { return {(i128)num * o.den, (i128)den * o.num}; }
+    Frac operator-() const { return {-num, den}; }
+    bool operator<(Frac o) const { return (i128)num * o.den < (i128)o.num * den; }
+    bool operator==(Frac o) const { return num == o.num && den == o.den; }
+    friend ostream& operator<<(ostream& os, Frac f) {
+        return f.den == 1 ? os << f.num : os << f.num << "/" << f.den;
     }
 };
 ```
