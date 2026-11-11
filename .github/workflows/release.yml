@@ -1,0 +1,50 @@
+name: Build and Release PDF
+
+on:
+  push:
+    tags:
+      - 'v*' # 推送形如 v1.0.0, v0.1 的 tag 时触发
+  workflow_dispatch: # 支持在 GitHub Actions 页面手动运行测试
+
+permissions:
+  contents: write # 发布 Release 和上传附件所需的权限
+
+jobs:
+  build-and-release:
+    name: Build Typst and Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk fonts-jetbrains-mono
+
+      - name: Setup Typst
+        uses: typst-community/setup-typst@v4
+
+      - name: Compile Typst to PDF
+        run: |
+          typst compile ACM/cheat_sheet.typ cheat_sheet.pdf
+          # 如果是 tag 触发，复制一份带具体版本号的文件名
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            cp cheat_sheet.pdf "cheat_sheet-${{ github.ref_name }}.pdf"
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cheat_sheet-pdf
+          path: cheat_sheet*.pdf
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: cheat_sheet*.pdf
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
