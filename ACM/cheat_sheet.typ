@@ -3632,6 +3632,113 @@ inline i32 point_in_convex(const Point& p, const Polygon& poly) {
 }
 ```
 
+== 旋转卡壳与 Minkowski 和 (Rotating Calipers & Minkowski Sum)
+- *旋转卡壳 (Rotating Calipers)*：利用凸多边形的对踵点对（Antipodal Pairs）单调移动性质。当一条底边在凸包上按逆时针逆行时，对踵顶点的距离/面积呈现单峰性质，可在 $O(n)$ 时间内完成凸包直径、最小外接矩形求解。
+- *凸包直径*：求凸包上点对的最大距离平方，避免开方误差。
+- *最小外接矩形*：卡壳同时维护顶端点（高度最大）、右端点（沿边投影最远）、左端点（投影最近），四条切线锁定外包矩形。
+- *Minkowski 和*：两个凸多边形 $A, B$ 的点集和 $A + B = \{a + b \mid a in A, b in B\}$。几何上可将 $A$ 与 $B$ 的所有边向量按极角排序归并得到新的凸包，复杂度 $O(|A| + |B|)$。常用于判定两多边形碰撞：$A, B$ 相交等价于 $A - B$ 包含原点。
+
+```cpp
+// 旋转卡壳求凸包直径 (最远点对距离的平方)，要求凸包逆时针严格排列且 n >= 2
+inline f64 rotating_calipers_diameter(const Polygon& hull) {
+    i32 n = sz(hull);
+    if (n == 2) return (hull[0] - hull[1]).abs2();
+    f64 max_d2 = 0;
+    i32 j = 2;
+    rep(i, 0, n) {
+        Point a = hull[i], b = hull[(i + 1) % n];
+        while ((b - a).cross(hull[(j + 1) % n] - a) > (b - a).cross(hull[j] - a)) {
+            j = (j + 1) % n;
+        }
+        max_d2 = max({max_d2, (hull[j] - a).abs2(), (hull[j] - b).abs2()});
+    }
+    return max_d2;
+}
+
+// 旋转卡壳求凸多边形最小外接矩形 (返回 {最小面积, 最小周长})
+inline pair<f64, f64> min_enclosing_rectangle(const Polygon& hull) {
+    i32 n = sz(hull);
+    if (n <= 2) return {0, 0};
+    f64 min_area = numeric_limits<f64>::max();
+    f64 min_peri = numeric_limits<f64>::max();
+    i32 t = 1, r = 1, l = 1;
+
+    rep(i, 0, n) {
+        Point a = hull[i], b = hull[(i + 1) % n];
+        Vector edge = b - a;
+        f64 edge_len = edge.abs();
+
+        // 顶端点: 叉积最大 (高度最高)
+        while ((b - a).cross(hull[(t + 1) % n] - a) >= (b - a).cross(hull[t] - a) - eps) {
+            t = (t + 1) % n;
+            if (t == (i + 1) % n) break;
+        }
+        // 右端点: 点积最大 (沿底边投影最远)
+        while (edge.dot(hull[(r + 1) % n] - a) >= edge.dot(hull[r] - a) - eps) {
+            r = (r + 1) % n;
+            if (r == (i + 1) % n) break;
+        }
+        // 左端点: 反向点积最大 (沿底边投影最近)
+        while ((a - b).dot(hull[(l + 1) % n] - a) >= (a - b).dot(hull[l] - a) - eps) {
+            l = (l + 1) % n;
+            if (l == (i + 1) % n) break;
+        }
+
+        f64 h = fabs((b - a).cross(hull[t] - a)) / edge_len;
+        f64 w = (edge.dot(hull[r] - a) - edge.dot(hull[l] - a)) / edge_len;
+        if (w > eps && h > eps) {
+            min_area = min(min_area, w * h);
+            min_peri = min(min_peri, 2.0 * (w + h));
+        }
+    }
+    return {min_area, min_peri};
+}
+
+// 凸多边形 Minkowski 和: 归并边向量 O(|A| + |B|)
+// 输入: 两个逆时针严格凸包 (sz >= 3)
+// 输出: Minkowski 和生成的凸包顶点 (逆时针排列)
+inline Polygon minkowski_sum(Polygon A, Polygon B) {
+    i32 n = sz(A), m = sz(B);
+    if (n < 3 || m < 3) return {};
+
+    // 旋转至以最左下角为起点
+    auto reorder = [](Polygon& poly) {
+        i32 p = 0;
+        rep(i, 1, sz(poly)) {
+            if (poly[i].y < poly[p].y || (poly[i].y == poly[p].y && poly[i].x < poly[p].x)) {
+                p = i;
+            }
+        }
+        rotate(poly.begin(), poly.begin() + p, poly.end());
+    };
+    reorder(A);
+    reorder(B);
+
+    vector<Vector> e1(n), e2(m);
+    rep(i, 0, n) e1[i] = A[(i + 1) % n] - A[i];
+    rep(i, 0, m) e2[i] = B[(i + 1) % m] - B[i];
+
+    Polygon res;
+    res.push_back(A[0] + B[0]);
+    i32 i = 0, j = 0;
+    while (i < n && j < m) {
+        f64 cp = e1[i].cross(e2[j]);
+        if (cp > eps) {
+            res.push_back(res.back() + e1[i++]);
+        } else if (cp < -eps) {
+            res.push_back(res.back() + e2[j++]);
+        } else {
+            res.push_back(res.back() + e1[i++] + e2[j++]);
+        }
+    }
+    while (i < n) res.push_back(res.back() + e1[i++]);
+    while (j < m) res.push_back(res.back() + e2[j++]);
+    res.pop_back(); // 移除首尾重合点
+    return res;
+}
+```
+
+
 
 = Tricks
 == 对拍
