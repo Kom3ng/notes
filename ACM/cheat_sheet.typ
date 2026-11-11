@@ -30,6 +30,7 @@
 #pagebreak()
 
 = 缺省源
+== 常用宏与类型定义
 ```cpp
 #include <bits/stdc++.h>
 #define all(x) (x).begin(), (x).end()
@@ -49,6 +50,170 @@ using u64 = uint64_t;
 using f32 = float;
 using f64 = double;
 using f128 = long double;
+```
+
+== 快读与快写 (Fast I/O)
+- *标准流加速*：`cin.tie(nullptr)` 与 `ios::sync_with_stdio(false)`。解除流同步后严禁混用 C 风格输入输出（`scanf`/`printf`）；换行推荐统一采用 `'\n'`，避免使用 `endl` 强制清空缓冲区引发性能瓶颈。
+- *轻量级模板快读快写*：基于 `getchar` / `putchar` 实现，天然兼容负数、任意整型（含 `__int128`）及多变量变长传参，短小易记。
+- *极致 `fread` / `fwrite` 缓冲快读快写*：采用 $1"MB"$ 块缓冲区减少系统调用，适用于数据量 $>= 10^6$ 的超大输入输出极限卡常题。
+
+```cpp
+// 1. 标准流加速 (竞赛首选推荐)
+inline void fast_io() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+}
+
+// 2. 轻量通用快读快写 (基于 getchar / putchar，支持负数与 i128)
+template <typename T>
+inline bool read(T& x) {
+    x = 0;
+    i32 f = 1;
+    i32 ch = getchar();
+    while (ch != EOF && (ch < '0' || ch > '9')) {
+        if (ch == '-') f = -1;
+        ch = getchar();
+    }
+    if (ch == EOF) return false;
+    while (ch >= '0' && ch <= '9') {
+        x = x * 10 + (ch - '0');
+        ch = getchar();
+    }
+    x *= f;
+    return true;
+}
+
+// 变长参数支持: read(n, m, k)
+template <typename T, typename... Args>
+inline bool read(T& x, Args&... args) {
+    return read(x) && read(args...);
+}
+
+template <typename T>
+inline void write(T x) {
+    if (x < 0) {
+        putchar('-');
+        if constexpr (is_same_v<T, i128>) {
+            u128 ux = -static_cast<u128>(x);
+            write(ux);
+        } else {
+            auto ux = -static_cast<make_unsigned_t<T>>(x);
+            write(ux);
+        }
+        return;
+    }
+    if (x > 9) write(x / 10);
+    putchar(static_cast<char>('0' + (x % 10)));
+}
+
+template <typename T>
+inline void writeln(const T& x) {
+    write(x);
+    putchar('\n');
+}
+
+// 3. 极致性能 fread / fwrite 块缓冲 I/O (数据量 >= 10^6 极限卡常)
+struct FastIO {
+    static constexpr i32 BUF_SIZE = 1 << 20; // 1MB 缓冲区
+    char in_buf[BUF_SIZE], *in_p1 = in_buf, *in_p2 = in_buf;
+    char out_buf[BUF_SIZE], *out_p = out_buf;
+
+    inline char gc() {
+        if (in_p1 == in_p2) {
+            in_p2 = (in_p1 = in_buf) + fread(in_buf, 1, BUF_SIZE, stdin);
+            if (in_p1 == in_p2) return EOF;
+        }
+        return *in_p1++;
+    }
+
+    inline void pc(char ch) {
+        if (out_p - out_buf == BUF_SIZE) {
+            fwrite(out_buf, 1, BUF_SIZE, stdout);
+            out_p = out_buf;
+        }
+        *out_p++ = ch;
+    }
+
+    ~FastIO() {
+        if (out_p != out_buf) {
+            fwrite(out_buf, 1, out_p - out_buf, stdout);
+            out_p = out_buf;
+        }
+    }
+
+    template <typename T>
+    inline bool read(T& x) {
+        x = 0;
+        i32 f = 1;
+        char ch = gc();
+        while (ch != EOF && (ch < '0' || ch > '9')) {
+            if (ch == '-') f = -1;
+            ch = gc();
+        }
+        if (ch == EOF) return false;
+        while (ch >= '0' && ch <= '9') {
+            x = x * 10 + (ch - '0');
+            ch = gc();
+        }
+        x *= f;
+        return true;
+    }
+
+    template <typename T, typename... Args>
+    inline bool read(T& x, Args&... args) {
+        return read(x) && read(args...);
+    }
+
+    // 读取连续字符串 (跳过空白字符)
+    inline bool read(string& s) {
+        s.clear();
+        char ch = gc();
+        while (ch != EOF && isspace(static_cast<unsigned char>(ch))) ch = gc();
+        if (ch == EOF) return false;
+        while (ch != EOF && !isspace(static_cast<unsigned char>(ch))) {
+            s.push_back(ch);
+            ch = gc();
+        }
+        return true;
+    }
+
+    template <typename T>
+    inline void write(T x) {
+        if (x < 0) {
+            pc('-');
+            if constexpr (is_same_v<T, i128>) {
+                u128 ux = -static_cast<u128>(x);
+                write_unsigned(ux);
+            } else {
+                auto ux = -static_cast<make_unsigned_t<T>>(x);
+                write_unsigned(ux);
+            }
+            return;
+        }
+        write_unsigned(x);
+    }
+
+    template <typename T>
+    inline void write_unsigned(T x) {
+        static char stk[45];
+        i32 top = 0;
+        do {
+            stk[top++] = static_cast<char>('0' + (x % 10));
+            x /= 10;
+        } while (x);
+        while (top > 0) pc(stk[--top]);
+    }
+
+    inline void write(char ch) { pc(ch); }
+    inline void write(const char* s) { while (*s) pc(*s++); }
+    inline void write(const string& s) { for (char c : s) pc(c); }
+
+    template <typename T>
+    inline void writeln(const T& x) {
+        write(x);
+        pc('\n');
+    }
+} io;
 ```
 
 = 基础算法
