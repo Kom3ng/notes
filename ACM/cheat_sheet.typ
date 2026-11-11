@@ -3396,6 +3396,131 @@ i64 query_kth(i64 k) {
 }
 ```
 
+= 计算几何
+
+== 二维几何基础 (点、向量、线与线段)
+浮点精度误差和退化边界（三点共线、向量重合、直线平行）是计算几何的核心难点。
+- *浮点比较*：引入阈值 $"eps" = 10^(-9)$，统一使用 `sign` 与 `cmp` 进行大小和符号判定。
+- *叉积意义*：二维叉积 $bold(a) times bold(b) = x_a y_b - x_b y_a$。若 $> 0$ 则 $bold(b)$ 在 $bold(a)$ 逆时针方向（左侧）；若 $< 0$ 在顺时针方向（右侧）；若 $= 0$ 则两向量共线。
+- *线段相交*：必须同时通过*快速排斥实验*（两线段坐标投影构成的轴对齐外包矩形相交）和*跨立实验*（相互跨立判定，双向叉积异号或为 0）。
+
+```cpp
+constexpr f64 eps = 1e-9;
+constexpr f64 pi = acos(-1.0);
+
+inline i32 sign(f64 x) {
+    if (fabs(x) < eps) return 0;
+    return x < 0 ? -1 : 1;
+}
+
+inline i32 cmp(f64 x, f64 y) {
+    return sign(x - y);
+}
+
+struct Point {
+    f64 x, y;
+    Point(f64 x = 0, f64 y = 0) : x(x), y(y) {}
+
+    Point operator+(const Point& p) const { return Point(x + p.x, y + p.y); }
+    Point operator-(const Point& p) const { return Point(x - p.x, y - p.y); }
+    Point operator*(f64 k) const { return Point(x * k, y * k); }
+    Point operator/(f64 k) const { return Point(x / k, y / k); }
+
+    bool operator==(const Point& p) const {
+        return cmp(x, p.x) == 0 && cmp(y, p.y) == 0;
+    }
+    bool operator<(const Point& p) const {
+        i32 c = cmp(x, p.x);
+        return c != 0 ? c < 0 : cmp(y, p.y) < 0;
+    }
+
+    f64 dot(const Point& p) const { return x * p.x + y * p.y; }
+    f64 cross(const Point& p) const { return x * p.y - y * p.x; }
+    f64 abs2() const { return dot(*this); }
+    f64 abs() const { return std::sqrt(abs2()); }
+    f64 arg() const { return std::atan2(y, x); }
+
+    // 逆时针旋转 rad 弧度
+    Point rotate(f64 rad) const {
+        return Point(x * cos(rad) - y * sin(rad), x * sin(rad) + y * cos(rad));
+    }
+    // 逆时针旋转 90 度
+    Point rot90() const { return Point(-y, x); }
+    // 单位向量 (确保非零)
+    Point unit() const { return *this / abs(); }
+};
+using Vector = Point;
+
+// 点在有向直线 ab 的位置: > 0 在左侧, < 0 在右侧, = 0 共线
+inline i32 to_left(const Point& a, const Point& b, const Point& p) {
+    return sign((b - a).cross(p - a));
+}
+
+// 点 p 到直线 ab 的投影点 (垂足)
+inline Point project(const Point& p, const Point& a, const Point& b) {
+    Vector v = b - a;
+    return a + v * (v.dot(p - a) / v.abs2());
+}
+
+// 点 p 关于直线 ab 的轴对称点
+inline Point reflect(const Point& p, const Point& a, const Point& b) {
+    return project(p, a, b) * 2.0 - p;
+}
+
+// 判断点 p 是否在线段 ab 上 (含端点)
+inline bool on_segment(const Point& p, const Point& a, const Point& b) {
+    return sign((p - a).cross(b - a)) == 0 && sign((p - a).dot(p - b)) <= 0;
+}
+
+// 点 p 到直线 ab 的距离
+inline f64 dist_to_line(const Point& p, const Point& a, const Point& b) {
+    return fabs((b - a).cross(p - a)) / (b - a).abs();
+}
+
+// 点 p 到线段 ab 的最短距离
+inline f64 dist_to_segment(const Point& p, const Point& a, const Point& b) {
+    if (sign((p - a).dot(b - a)) < 0) return (p - a).abs();
+    if (sign((p - b).dot(a - b)) < 0) return (p - b).abs();
+    return dist_to_line(p, a, b);
+}
+
+// 直线定义: 点向式 p + t * v
+struct Line {
+    Point p;
+    Vector v;
+    Line() {}
+    Line(Point p, Vector v) : p(p), v(v) {}
+    Line(Point a, Point b, bool is_two_pts) : p(a), v(b - a) { (void)is_two_pts; }
+
+    Point eval(f64 t) const { return p + v * t; }
+};
+
+// 两直线交点 (需满足两直线不平行，即 sign(a.v.cross(b.v)) != 0)
+inline Point line_intersection(const Line& a, const Line& b) {
+    f64 t = (b.p - a.p).cross(b.v) / a.v.cross(b.v);
+    return a.eval(t);
+}
+
+// 两线段 a-b 与 c-d 是否相交 (包含端点重合或相交)
+inline bool segment_intersection(const Point& a, const Point& b, const Point& c, const Point& d) {
+    // 快速排斥实验 (Bounding Box 快速剔除)
+    if (max(a.x, b.x) < min(c.x, d.x) || max(c.x, d.x) < min(a.x, b.x) ||
+        max(a.y, b.y) < min(c.y, d.y) || max(c.y, d.y) < min(a.y, b.y)) {
+        return false;
+    }
+    // 跨立实验
+    return sign((b - a).cross(c - a)) * sign((b - a).cross(d - a)) <= 0 &&
+           sign((d - c).cross(a - c)) * sign((d - c).cross(b - c)) <= 0;
+}
+
+// 两线段 a-b 与 c-d 的最短空间距离
+inline f64 segment_dist(const Point& a, const Point& b, const Point& c, const Point& d) {
+    if (segment_intersection(a, b, c, d)) return 0.0;
+    return min({dist_to_segment(a, c, d), dist_to_segment(b, c, d),
+                dist_to_segment(c, a, b), dist_to_segment(d, a, b)});
+}
+```
+
 = Tricks
 == 对拍
 ```bash
