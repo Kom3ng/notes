@@ -3521,6 +3521,118 @@ inline f64 segment_dist(const Point& a, const Point& b, const Point& c, const Po
 }
 ```
 
+== 多边形与凸包 (Polygon & Convex Hull)
+- *多边形面积与重心*：任意简单多边形均可剖分为若干以原点为顶点的有向三角形，利用叉积代数和求解面积与重心。
+- *点与多边形关系 (射线法)*：从待查点引向水平向右的射线，统计与各边的交点次数；奇数在内、偶数在外。需注意点在边上及射线穿过多边形顶点的边界处理。
+- *二维凸包 (Andrew 算法)*：Graham 扫描法的排序改进版，按坐标 $(x, y)$ 排序后分别利用单调栈扫描下凸壳与上凸壳，时间复杂度稳定 $O(n log n)$。
+- *点在凸多边形内判定 (二分法)*：以 $P[0]$ 为极点，二分待查点落在哪两个相邻顶点张成的角内，仅需一次叉积判断，将单次查询复杂度优化至 $O(log n)$。
+
+```cpp
+using Polygon = vector<Point>;
+
+// 多边形有向面积 (逆时针排列为正，顺时针排列为负)
+inline f64 polygon_area(const Polygon& poly) {
+    f64 res = 0;
+    i32 n = sz(poly);
+    rep(i, 0, n) {
+        res += poly[i].cross(poly[(i + 1) % n]);
+    }
+    return res / 2.0;
+}
+
+// 多边形重心
+inline Point polygon_centroid(const Polygon& poly) {
+    Point c(0, 0);
+    f64 total_area = 0;
+    i32 n = sz(poly);
+    rep(i, 0, n) {
+        f64 a = poly[i].cross(poly[(i + 1) % n]);
+        total_area += a;
+        c = c + (poly[i] + poly[(i + 1) % n]) * a;
+    }
+    return c / (total_area * 3.0);
+}
+
+// 射线法判定点与简单多边形位置: 2 严格内部, 1 边界上, 0 外部
+inline i32 point_in_polygon(const Point& p, const Polygon& poly) {
+    i32 n = sz(poly);
+    bool inside = false;
+    rep(i, 0, n) {
+        Point a = poly[i], b = poly[(i + 1) % n];
+        if (on_segment(p, a, b)) return 1;
+        if (a.y > b.y) swap(a, b);
+        if (p.y > a.y && p.y <= b.y && sign((b - a).cross(p - a)) > 0) {
+            inside = !inside;
+        }
+    }
+    return inside ? 2 : 0;
+}
+
+// Andrew 算法求凸包: 逆时针输出顶点序列
+// strict = true: 严格凸包 (边上不含共线点); strict = false: 允许包含边上的共线点
+inline Polygon convex_hull(Polygon pts, bool strict = true) {
+    i32 n = sz(pts);
+    if (n <= 1) return pts;
+    sort(all(pts));
+    pts.erase(unique(all(pts)), pts.end());
+    n = sz(pts);
+    if (n <= 2) return pts;
+
+    Polygon hull(2 * n);
+    i32 k = 0;
+    // 构建下凸壳
+    rep(i, 0, n) {
+        while (k >= 2) {
+            f64 cp = (hull[k - 1] - hull[k - 2]).cross(pts[i] - hull[k - 1]);
+            if (strict ? cp <= eps : cp < -eps) --k;
+            else break;
+        }
+        hull[k++] = pts[i];
+    }
+    // 构建上凸壳
+    i32 t = k + 1;
+    for (i32 i = n - 2; i >= 0; --i) {
+        while (k >= t) {
+            f64 cp = (hull[k - 1] - hull[k - 2]).cross(pts[i] - hull[k - 1]);
+            if (strict ? cp <= eps : cp < -eps) --k;
+            else break;
+        }
+        hull[k++] = pts[i];
+    }
+    hull.resize(k - 1); // 弹出末尾与起点重复的闭合点
+    return hull;
+}
+
+// 二分法在 O(log n) 内判定点是否在严格凸多边形内 (需按逆时针排列)
+// 返回: 2 严格内部, 1 边界上, 0 外部
+inline i32 point_in_convex(const Point& p, const Polygon& poly) {
+    i32 n = sz(poly);
+    if (n < 3) return 0;
+    f64 c1 = (poly[1] - poly[0]).cross(p - poly[0]);
+    f64 c2 = (poly[n - 1] - poly[0]).cross(p - poly[0]);
+    if (sign(c1) < 0 || sign(c2) > 0) return 0;
+    if (sign(c1) == 0 && on_segment(p, poly[0], poly[1])) return 1;
+    if (sign(c2) == 0 && on_segment(p, poly[0], poly[n - 1])) return 1;
+
+    i32 l = 1, r = n - 2, idx = 1;
+    while (l <= r) {
+        i32 mid = l + (r - l) / 2;
+        if (sign((poly[mid] - poly[0]).cross(p - poly[0])) >= 0) {
+            idx = mid;
+            l = mid + 1;
+        } else {
+            r = mid - 1;
+        }
+    }
+    f64 cp = (poly[idx + 1] - poly[idx]).cross(p - poly[idx]);
+    i32 s = sign(cp);
+    if (s > 0) return 2;
+    if (s == 0) return on_segment(p, poly[idx], poly[idx + 1]) ? 1 : 0;
+    return 0;
+}
+```
+
+
 = Tricks
 == 对拍
 ```bash
