@@ -3132,6 +3132,73 @@ i64 stirling2_single(i64 n, i32 k) {
 }
 ```
 
+== 康托展开 (Cantor Expansion)
+实现全排列与字典序排名（1-based，范围 $1 tilde n!$）之间的双向映射。
+- *康托展开公式*：
+  $ X = sum_(i=1)^n A_i times (n - i)! $
+  其中 $A_i$ 表示排列中未出现过的元素中，严格小于当前元素 $a_i$ 的个数（即 $a_i$ 之后比它小的元素个数）。
+  - 0-based 排名为 $X$；1-based 排名为 $X + 1$。
+- *算法优化与复杂度*：
+  - *康托展开*：使用树状数组动态维护可用元素，将单次查询与更新优化至 $O(log n)$，整体时间复杂度 $O(n log n)$，适用于 $n <= 10^6$ 及大模数场景。
+  - *逆康托展开*：给定排名 $k$ 反推排列，依次除以 $(n - i)!$ 取商得对应排名后更新余数。因 $20! approx 2.43 times 10^(18)$，通常 $n <= 20$ 采用 64 位整数精确求解，时间复杂度 $O(n^2)$。
+
+```cpp
+// 1. 康托展开 (O(n log n)，树状数组优化，支持 n <= 1e6，模 mod)
+constexpr i32 mod = 998244353;
+constexpr i32 maxn = 1000005;
+i32 tr[maxn];
+i64 fac[maxn];
+
+void add(i32 p, i32 v, i32 n) {
+    for (i32 i = p; i <= n; i += i & -i) tr[i] += v;
+}
+
+i32 query(i32 p) {
+    i32 ans = 0;
+    for (i32 i = p; i > 0; i -= i & -i) ans += tr[i];
+    return ans;
+}
+
+// 输入: 1 ~ n 的全排列 p (0-based 数组，值域 [1, n])
+// 输出: 该排列在所有全排列中的字典序排名 (1-based，结果取模 m)
+i64 cantor(const vector<i32>& p, i32 m = mod) {
+    i32 n = sz(p);
+    fac[0] = 1;
+    rep1(i, 1, n) fac[i] = fac[i - 1] * i % m;
+    rep1(i, 1, n) tr[i] = i & -i;
+
+    i64 rank = 0;
+    rep(i, 0, n) {
+        i32 smaller = query(p[i] - 1);
+        rank = (rank + 1LL * smaller * fac[n - 1 - i]) % m;
+        add(p[i], -1, n);
+    }
+    return (rank + 1) % m;
+}
+
+// 2. 逆康托展开 (适用于 n <= 20，k 为 1-based 排名)
+// 输入: 排列长度 n，1-based 字典序排名 k (1 <= k <= n!)
+// 输出: 对应的 1 ~ n 全排列
+vector<i32> decantor(i32 n, i64 k) {
+    --k; // 转化为 0-based 排名
+    vector<i64> f(n + 1, 1);
+    rep1(i, 1, n) f[i] = f[i - 1] * i;
+
+    vector<i32> available(n);
+    iota(all(available), 1);
+
+    vector<i32> p(n);
+    rep(i, 0, n) {
+        i64 cnt = f[n - 1 - i];
+        i32 idx = static_cast<i32>(k / cnt);
+        k %= cnt;
+        p[i] = available[idx];
+        available.erase(available.begin() + idx);
+    }
+    return p;
+}
+```
+
 == 容斥原理与反演
 
 === 1. 核心理论与反演模型速查
