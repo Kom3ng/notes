@@ -3738,6 +3738,95 @@ inline Polygon minkowski_sum(Polygon A, Polygon B) {
 }
 ```
 
+== 半平面交 (Half-Plane Intersection)
+- *半平面表示*：采用有向直线 $bold(p) + t bold(v)$ 表示半平面，统一约定*直线方向的左侧*为有效可行域，即满足 $bold(v) times (bold(x) - bold(p)) >= 0$。
+- *S&I 增量双端队列算法*：
+  1. 计算极角 $"atan2"(v.y, v.x)$，按极角升序排序；
+  2. 若极角相同，保留位于更左侧（更靠内）的半平面，去除冗余；
+  3. 用双端队列 `deque` 维护当前凸核的有向边和相邻交点；
+  4. 遍历半平面，循环检查队尾与队首交点是否落在当前半平面的外侧（右侧），若在外侧则弹出对应半平面；
+  5. 遍历结束后，首尾相互检查并弹出越界半平面；
+  6. 相邻直线交点构成半平面交多边形的顶点序列。若顶点数 $< 3$ 则交集为空或退化。
+  7. 复杂度为极角排序的瓶颈 $O(n log n)$。若题目未给定边界，应显式加入足够大的外包矩形四条有向边（如 $[-M, M] times [-M, M]$）。
+
+```cpp
+struct Halfplane {
+    Point p;
+    Vector v;
+    f64 angle;
+    Halfplane() {}
+    Halfplane(Point p, Vector v) : p(p), v(v), angle(atan2(v.y, v.x)) {}
+    Halfplane(Point a, Point b, bool) : p(a), v(b - a), angle(atan2(v.y, v.x)) {}
+
+    // 点是否在有向直线左侧 (处于半平面内)
+    bool contains(const Point& pt) const {
+        return sign(v.cross(pt - p)) >= 0;
+    }
+};
+
+// 两直线交点
+inline Point line_intersection(const Halfplane& a, const Halfplane& b) {
+    f64 t = (b.p - a.p).cross(b.v) / a.v.cross(b.v);
+    return a.p + a.v * t;
+}
+
+// S&I 增量双端队列法求半平面交: O(n log n)
+// 输入: 若干有向半平面 (左侧为有效区域，如无界需显式加入外包大矩形)
+// 输出: 凸多边形顶点 (逆时针排列，若为空或退化返回空 vector)
+inline Polygon halfplane_intersection(vector<Halfplane> h) {
+    // 1. 按极角升序排序
+    sort(all(h), [](const Halfplane& a, const Halfplane& b) {
+        if (fabs(a.angle - b.angle) > eps) return a.angle < b.angle;
+        return a.v.cross(b.p - a.p) < -eps; // 极角相同时保留更内侧的半平面
+    });
+
+    // 2. 极角去重
+    vector<Halfplane> lines;
+    rep(i, 0, sz(h)) {
+        if (!lines.empty() && fabs(h[i].angle - lines.back().angle) < eps) continue;
+        lines.push_back(h[i]);
+    }
+
+    // 3. 双端队列增量维护凸核
+    i32 n = sz(lines);
+    deque<Halfplane> q;
+    deque<Point> pts;
+
+    rep(i, 0, n) {
+        while (sz(q) >= 2 && !lines[i].contains(pts.back())) {
+            q.pop_back();
+            pts.pop_back();
+        }
+        while (sz(q) >= 2 && !lines[i].contains(pts.front())) {
+            q.pop_front();
+            pts.pop_front();
+        }
+        if (!q.empty()) {
+            pts.push_back(line_intersection(q.back(), lines[i]));
+        }
+        q.push_back(lines[i]);
+    }
+
+    // 4. 闭合消除多余半平面
+    while (sz(q) >= 2 && !q.front().contains(pts.back())) {
+        q.pop_back();
+        pts.pop_back();
+    }
+    while (sz(q) >= 2 && !q.back().contains(pts.front())) {
+        q.pop_front();
+        pts.pop_front();
+    }
+
+    if (sz(q) < 3) return {};
+
+    Polygon poly;
+    poly.push_back(line_intersection(q.back(), q.front()));
+    for (auto& pt : pts) poly.push_back(pt);
+    return poly;
+}
+```
+
+
 
 
 = Tricks
