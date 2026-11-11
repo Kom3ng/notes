@@ -3826,6 +3826,95 @@ inline Polygon halfplane_intersection(vector<Halfplane> h) {
 }
 ```
 
+== 圆与最小圆覆盖 (Circles & Min Circle Coverage)
+- *直线与圆交点*：先求圆心在直线上的垂足投影点 $p$，由勾股定理判断圆心到直线距离 $d$ 与半径 $r$ 的大小关系，沿直线方向加减切向距离 $sqrt(r^2 - d^2)$ 得到交点。
+- *两圆位置关系与交点*：根据两圆心距 $d = |o_1 - o_2|$ 与 $r_1 + r_2$ 以及 $|r_1 - r_2|$ 的大小判断外离、外切、相交、内切、内含。相交时由余弦定理计算夹角偏移量 $alpha = arccos frac(r_1^2 + d^2 - r_2^2, 2 r_1 d)$，旋转基准方向向量得到两个交点。
+- *两圆相交面积*：分为内含（小圆面积）、外离（0 面积）和相交（两弓形面积之和）。
+- *三角形外接圆 (Circumcircle)*：三边中垂线的交点。
+- *最小圆覆盖 (Welzl 算法)*：随机增量法，先随机打乱点序列；外层依次加入各点，若不在当前覆盖圆内，则该点必为新覆盖圆的边界点，以此重构内层圆。三重循环递归保证期望时间复杂度为严格的线性 $O(n)$。
+
+```cpp
+struct Circle {
+    Point o;
+    f64 r;
+    Circle(Point o = Point(), f64 r = 0) : o(o), r(r) {}
+};
+
+// 直线与圆的交点 (直线由点 a, b 确定)
+inline vector<Point> line_circle_intersection(const Point& a, const Point& b, const Circle& c) {
+    Point pr = project(c.o, a, b);
+    f64 d = (pr - c.o).abs();
+    if (sign(d - c.r) > 0) return {};
+    if (sign(d - c.r) == 0) return {pr};
+    f64 base = std::sqrt(c.r * c.r - d * d);
+    Vector dir = (b - a).unit();
+    return {pr - dir * base, pr + dir * base};
+}
+
+// 两圆交点 (相离/内含/重合返回空；相切返回 1 个点；相交返回 2 个点)
+inline vector<Point> circle_circle_intersection(const Circle& c1, const Circle& c2) {
+    f64 d = (c1.o - c2.o).abs();
+    if (sign(d) == 0 || sign(d - (c1.r + c2.r)) > 0 || sign(d - fabs(c1.r - c2.r)) < 0) {
+        return {}; // 重合、外离或内含
+    }
+    if (sign(d - (c1.r + c2.r)) == 0 || sign(d - fabs(c1.r - c2.r)) == 0) {
+        return {c1.o + (c2.o - c1.o).unit() * c1.r}; // 外切或内切
+    }
+    f64 alpha = acos((c1.r * c1.r + d * d - c2.r * c2.r) / (2.0 * c1.r * d));
+    f64 base_ang = (c2.o - c1.o).arg();
+    Point p1 = c1.o + Point(cos(base_ang + alpha), sin(base_ang + alpha)) * c1.r;
+    Point p2 = c1.o + Point(cos(base_ang - alpha), sin(base_ang - alpha)) * c1.r;
+    return {p1, p2};
+}
+
+// 两圆相交面积
+inline f64 circle_circle_area(const Circle& c1, const Circle& c2) {
+    f64 d = (c1.o - c2.o).abs();
+    if (sign(d - (c1.r + c2.r)) >= 0) return 0.0;
+    if (sign(d - fabs(c1.r - c2.r)) <= 0) {
+        f64 min_r = min(c1.r, c2.r);
+        return pi * min_r * min_r;
+    }
+    f64 a1 = acos((c1.r * c1.r + d * d - c2.r * c2.r) / (2.0 * c1.r * d));
+    f64 a2 = acos((c2.r * c2.r + d * d - c1.r * c1.r) / (2.0 * c2.r * d));
+    f64 s1 = c1.r * c1.r * (a1 - sin(a1) * cos(a1));
+    f64 s2 = c2.r * c2.r * (a2 - sin(a2) * cos(a2));
+    return s1 + s2;
+}
+
+// 三点确定外接圆 (要求三点不共线)
+inline Circle circumcircle(const Point& a, const Point& b, const Point& c) {
+    Point ab = b - a, ac = c - a;
+    f64 d = 2.0 * ab.cross(ac);
+    f64 x = (ac.y * ab.abs2() - ab.y * ac.abs2()) / d;
+    f64 y = (ab.x * ac.abs2() - ac.x * ab.abs2()) / d;
+    Point o = a + Point(x, y);
+    return Circle(o, (o - a).abs());
+}
+
+// 最小圆覆盖: Welzl 随机增量法，期望时间复杂度 O(n)
+inline Circle min_enclosing_circle(vector<Point> pts) {
+    mt19937 rng(1337);
+    shuffle(all(pts), rng);
+    Circle c(pts[0], 0);
+    i32 n = sz(pts);
+    rep(i, 1, n) {
+        if ((pts[i] - c.o).abs() <= c.r + eps) continue;
+        c = Circle(pts[i], 0);
+        rep(j, 0, i) {
+            if ((pts[j] - c.o).abs() <= c.r + eps) continue;
+            c = Circle((pts[i] + pts[j]) / 2.0, (pts[i] - pts[j]).abs() / 2.0);
+            rep(k, 0, j) {
+                if ((pts[k] - c.o).abs() <= c.r + eps) continue;
+                c = circumcircle(pts[i], pts[j], pts[k]);
+            }
+        }
+    }
+    return c;
+}
+```
+
+
 
 
 
