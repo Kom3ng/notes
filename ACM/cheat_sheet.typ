@@ -3914,6 +3914,122 @@ inline Circle min_enclosing_circle(vector<Point> pts) {
 }
 ```
 
+== 平面最近点对与三维几何 (Closest Pair & 3D Primitives)
+- *极角排序 (基于叉积无精度损失)*：避免直接调用 $"atan2"$ 产生浮点误差或在整数点下损失精度。先按上下半平面（上半平面及 $x$ 轴正半轴为上方，其余为下方）划分；同半平面内直接通过向量叉积 $bold(a) times bold(b) > 0$ 判定逆时针先后顺序。
+- *平面最近点对 (分治法)*：
+  1. 将点集按 $x$ 坐标排序，分治处理左右两半，递归求得左右子集的最小距离 $d = min(d_L, d_R)$；
+  2. 跨越中线的点对：仅需收集 $|x_i - x_("mid")| < d$ 的带状区域内的点，按 $y$ 坐标排序；
+  3. 线性扫描：根据平面稀疏性鸽巢原理，每个点只需与 $y$ 坐标在其后方且差值 $< d$ 的至多 6 个点比较，单次合并耗时 $O(n)$，整体复杂度 $O(n log n)$。
+- *三维几何基础*：
+  - 三维叉积：$bold(a) times bold(b) = (y_a z_b - z_a y_b, z_a x_b - x_a z_b, x_a y_b - y_a x_b)$；
+  - 点到平面距离：点 $bold(p)$ 到经过点 $bold(a)$ 且法向量为 $bold(n)$ 的平面的距离为 $frac(|(bold(p) - bold(a)) dot bold(n)|, |bold(n)|)$；
+  - 空间四面体体积：顶点 $bold(a), bold(b), bold(c), bold(d)$ 构成的四面体体积为 $frac(1, 6) |((bold(b) - bold(a)) times (bold(c) - bold(a))) dot (bold(d) - bold(a))|$。
+
+```cpp
+// 极角排序仿函数 (按极角逆时针排序，基于叉积防精度损失，支持全平面点)
+struct PolarCmp {
+    Point o;
+    PolarCmp(Point o = Point()) : o(o) {}
+
+    // 判定向量落在上半平面 (含 x 轴非负半轴) 还是下半平面
+    static i32 half(const Point& p) {
+        return (p.y > eps || (fabs(p.y) <= eps && p.x > -eps)) ? 1 : -1;
+    }
+
+    bool operator()(const Point& a, const Point& b) const {
+        Point va = a - o, vb = b - o;
+        i32 ha = half(va), hb = half(vb);
+        if (ha != hb) return ha > hb;
+        f64 cp = va.cross(vb);
+        if (fabs(cp) > eps) return cp > 0;
+        return va.abs2() < vb.abs2(); // 共线按距离升序
+    }
+};
+
+// 平面最近点对 (分治法): O(n log n)
+// 返回点集中两点间的最小欧几里得距离 (若点数 <= 1 返回 inf)
+inline f64 closest_pair(vector<Point> pts) {
+    i32 n = sz(pts);
+    if (n <= 1) return numeric_limits<f64>::infinity();
+
+    sort(all(pts), [](const Point& a, const Point& b) {
+        if (fabs(a.x - b.x) > eps) return a.x < b.x;
+        return a.y < b.y;
+    });
+
+    vector<Point> tmp(n);
+    auto solve = [&](auto& self, i32 l, i32 r) -> f64 {
+        if (r - l <= 3) {
+            f64 d = numeric_limits<f64>::infinity();
+            rep(i, l, r) {
+                rep(j, i + 1, r) {
+                    d = min(d, (pts[i] - pts[j]).abs());
+                }
+            }
+            sort(pts.begin() + l, pts.begin() + r, [](const Point& a, const Point& b) {
+                return a.y < b.y;
+            });
+            return d;
+        }
+
+        i32 mid = l + (r - l) / 2;
+        f64 mid_x = pts[mid].x;
+        f64 d = min(self(self, l, mid), self(self, mid, r));
+
+        // 按 y 坐标归并
+        inplace_merge(pts.begin() + l, pts.begin() + mid, pts.begin() + r,
+                      [](const Point& a, const Point& b) { return a.y < b.y; });
+
+        // 检查跨越中线的点对 (|x - mid_x| < d)
+        i32 cnt = 0;
+        rep(i, l, r) {
+            if (fabs(pts[i].x - mid_x) < d) {
+                tmp[cnt++] = pts[i];
+            }
+        }
+        rep(i, 0, cnt) {
+            for (i32 j = i + 1; j < cnt && tmp[j].y - tmp[i].y < d; ++j) {
+                d = min(d, (tmp[i] - tmp[j]).abs());
+            }
+        }
+        return d;
+    };
+
+    return solve(solve, 0, n);
+}
+
+// 三维几何基础
+struct Point3 {
+    f64 x, y, z;
+    Point3(f64 x = 0, f64 y = 0, f64 z = 0) : x(x), y(y), z(z) {}
+
+    Point3 operator+(const Point3& p) const { return Point3(x + p.x, y + p.y, z + p.z); }
+    Point3 operator-(const Point3& p) const { return Point3(x - p.x, y - p.y, z - p.z); }
+    Point3 operator*(f64 k) const { return Point3(x * k, y * k, z * k); }
+    Point3 operator/(f64 k) const { return Point3(x / k, y / k, z / k); }
+
+    f64 dot(const Point3& p) const { return x * p.x + y * p.y + z * p.z; }
+    Point3 cross(const Point3& p) const {
+        return Point3(y * p.z - z * p.y, z * p.x - x * p.z, x * p.y - y * p.x);
+    }
+    f64 abs2() const { return dot(*this); }
+    f64 abs() const { return std::sqrt(abs2()); }
+    Point3 unit() const { return *this / abs(); }
+};
+using Vector3 = Point3;
+
+// 点 p 到平面 (点 a 与法向量 n) 的距离
+inline f64 dist_to_plane(const Point3& p, const Point3& a, const Vector3& n) {
+    return fabs((p - a).dot(n)) / n.abs();
+}
+
+// 四面体 a-b-c-d 几何体积
+inline f64 tetrahedron_volume(const Point3& a, const Point3& b, const Point3& c, const Point3& d) {
+    return fabs((b - a).cross(c - a).dot(d - a)) / 6.0;
+}
+```
+
+
 
 
 
