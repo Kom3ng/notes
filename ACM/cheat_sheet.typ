@@ -4594,69 +4594,36 @@ int main() {
 }
 ```
 
-==== (2) 标准 I/O 交互对拍 (Python 极简脚本)
-Codeforces 常见模式：选手与评测机通过标准输入输出交互。使用 Python `subprocess.Popen` 可提供*严格超时限制*和*逐行交互日志记录*。特别提供 `forward_lines` 处理多行 `init_data`（如 $n$ 及 $m$ 条边）。
+==== (2) 标准 I/O 交互对拍 (Python 极简中继器)
+Codeforces 常见模式：选手与评测机通过标准输入输出交互。手写仅需 ~15 行，核心是封装 `pipe(src, dst)` 函数统一处理读入、转发与 `flush`（支持单行/多行 `init_data` 转发）。若担心死锁挂起，终端配合 `timeout 2s python3 interact.py` 运行。
 ```python
-# interact.py: 标准 IO 交互题对拍中继器 (支持多行 init_data)
-import subprocess, sys
+# interact.py: 交互题极简对拍 (~15 行，比赛极速手写)
+from subprocess import Popen, PIPE
 
-def run_test(case_id):
-    p_int = subprocess.Popen(['./interactor'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    p_sol = subprocess.Popen(['./sol'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    log = []
+def run():
+    A = Popen('./interactor', stdin=PIPE, stdout=PIPE, text=True) # 裁判
+    B = Popen('./sol', stdin=PIPE, stdout=PIPE, text=True)        # 选手
+    def pipe(src, dst):
+        s = src.stdout.readline()
+        if s: dst.stdin.write(s); dst.stdin.flush()
+        return s
 
-    # 辅助函数: 转发指定行数的数据并记录日志 (解决多行 init_data 死锁)
-    def forward_lines(src, dst, count, role="Judge -> Sol"):
-        lines = []
-        for _ in range(count):
-            line = src.stdout.readline()
-            if not line: break
-            dst.stdin.write(line)
-            lines.append(line.strip())
-            log.append(f"{role}: {line.strip()}")
-        dst.stdin.flush()
-        return lines
+    # 1. 转发初始数据 (若多行, 根据首行指示循环转发)
+    info = pipe(A, B)
+    # n, m = map(int, info.split()); [pipe(A, B) for _ in range(m)]
 
-    try:
-        # 1. 交互器先输出初始数据给选手 (注意: 许多题目初始数据是多行)
-        first_line = p_int.stdout.readline()
-        if first_line:
-            p_sol.stdin.write(first_line); p_sol.stdin.flush()
-            log.append(f"Judge -> Sol: {first_line.strip()}")
-            # 若首行给出了后续行数 (例如 n, m，后续跟 m 行树边):
-            # n, m = map(int, first_line.split())
-            # forward_lines(p_int, p_sol, m, role="Judge -> Sol")
+    # 2. 交互轮询 (可在 pipe 内部加 print(s, end='') 实时观测)
+    while True:
+        if not pipe(B, A): break # 选手 -> 裁判 (询问/答题)
+        res = pipe(A, B)         # 裁判 -> 选手 (反馈)
+        if not res or res.strip() in ("OK", "-1"): break
 
-        while True:
-            # 2. 选手发起询问或报告答案
-            sol_out = p_sol.stdout.readline()
-            if not sol_out: break
-            log.append(f"Sol -> Judge: {sol_out.strip()}")
-            p_int.stdin.write(sol_out); p_int.stdin.flush()
+    A.wait(); B.wait()
+    return A.returncode == 0 and B.returncode == 0
 
-            # 3. 交互器给出判定反馈 (若反馈也是多行，同样调用 forward_lines)
-            judge_out = p_int.stdout.readline()
-            if not judge_out: break
-            log.append(f"Judge -> Sol: {judge_out.strip()}")
-            p_sol.stdin.write(judge_out); p_sol.stdin.flush()
-
-            if judge_out.strip() in ("OK", "-1"): break
-
-        p_sol.wait(timeout=2.0); p_int.wait(timeout=2.0)
-        if p_int.returncode != 0:
-            print(f"[WA on Test #{case_id}]")
-            print("\n".join(log[-10:]))
-            return False
-        return True
-    except subprocess.TimeoutExpired:
-        p_sol.kill(); p_int.kill()
-        print(f"[TLE / Deadlock on Test #{case_id}] (Check if missing fflush/endl or unread init_data)")
-        print("\n".join(log[-10:]))
-        return False
-
-for i in range(1, 101):
-    if not run_test(i): sys.exit(1)
-print("All 100 interactive tests passed!")
+for t in range(1, 101):
+    if not run(): print(f"WA on #{t}"); break
+    print(f"#{t} AC")
 ```
 
 ==== (3) Linux 命名管道双向对拍 (Bash 免死锁)
