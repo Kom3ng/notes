@@ -1846,6 +1846,77 @@ void tree_knapsack_dfs(i32 u, i32 cap, const i32 w[], const i64 val[]) {
 ```
 
 = 字符串
+
+== 字符串哈希 (String Hash)
+静态数组，1-based。预处理时间 $O(n)$，支持 $O(1)$ 查询任意子串哈希值。
+- *单哈希 (自然溢出)*：利用 `u64` 自然溢出等价于模 $2^64$，代码最短、常数最小。
+- *双哈希 (防卡模数)*：采用两个独立的大质数模数（如 $10^9+7, 10^9+9$）和不同基数，碰撞概率降至 $10^(-18)$ 级别，彻底防范针对自然溢出的恶意构造。
+- *二维矩阵哈希*：行、列两个方向分别乘不同基数，二维前缀和容斥，支持 $O(1)$ 查询任意子矩形哈希。
+
+```cpp
+// 1. 自然溢出单哈希 (1-based, 极短好写)
+constexpr i32 maxn = 1000005;
+constexpr u64 base = 13331;
+u64 h[maxn], p[maxn];
+
+void init_hash(const string& s) {
+    i32 n = sz(s);
+    p[0] = 1;
+    rep1(i, 1, n) {
+        p[i] = p[i - 1] * base;
+        h[i] = h[i - 1] * base + s[i - 1];
+    }
+}
+
+inline u64 query_hash(i32 l, i32 r) {
+    return h[r] - h[l - 1] * p[r - l + 1];
+}
+
+// 2. 双哈希 (双模数防 Hack，强对抗比赛推荐)
+constexpr i64 mod1 = 1000000007, mod2 = 1000000009;
+constexpr i64 b1 = 131, b2 = 13331;
+i64 h1[maxn], h2[maxn], p1[maxn], p2[maxn];
+
+void init_double_hash(const string& s) {
+    i32 n = sz(s);
+    p1[0] = p2[0] = 1;
+    rep1(i, 1, n) {
+        p1[i] = p1[i - 1] * b1 % mod1;
+        p2[i] = p2[i - 1] * b2 % mod2;
+        h1[i] = (h1[i - 1] * b1 + s[i - 1]) % mod1;
+        h2[i] = (h2[i - 1] * b2 + s[i - 1]) % mod2;
+    }
+}
+
+inline pair<i64, i64> query_double_hash(i32 l, i32 r) {
+    i64 v1 = (h1[r] - h1[l - 1] * p1[r - l + 1] % mod1 + mod1) % mod1;
+    i64 v2 = (h2[r] - h2[l - 1] * p2[r - l + 1] % mod2 + mod2) % mod2;
+    return {v1, v2};
+}
+
+// 3. 二维矩阵哈希 (O(1) 查询子矩形 [x1..x2][y1..y2] 哈希)
+constexpr i32 maxm = 1005;
+u64 h2d[maxm][maxm], p_row[maxm], p_col[maxm];
+
+void init_matrix_hash(const vector<string>& mat, i32 n, i32 m) {
+    p_row[0] = p_col[0] = 1;
+    rep1(i, 1, n) p_row[i] = p_row[i - 1] * b1;
+    rep1(j, 1, m) p_col[j] = p_col[j - 1] * b2;
+    rep1(i, 1, n) {
+        rep1(j, 1, m) {
+            h2d[i][j] = h2d[i - 1][j] * b1 + h2d[i][j - 1] * b2
+                      - h2d[i - 1][j - 1] * b1 * b2 + mat[i - 1][j - 1];
+        }
+    }
+}
+
+inline u64 query_matrix_hash(i32 x1, i32 y1, i32 x2, i32 y2) {
+    i32 dx = x2 - x1 + 1, dy = y2 - y1 + 1;
+    return h2d[x2][y2] - h2d[x1 - 1][y2] * p_row[dx] - h2d[x2][y1 - 1] * p_col[dy]
+         + h2d[x1 - 1][y1 - 1] * p_row[dx] * p_col[dy];
+}
+```
+
 == KMP
 前缀函数 `nxt` 静态数组，0-based：
 ```cpp
