@@ -1847,12 +1847,23 @@ void tree_knapsack_dfs(i32 u, i32 cap, const i32 w[], const i64 val[]) {
 
 = 字符串
 
-== 字符串哈希 (String Hash)
+== 字符串与常用哈希 (Hashing)
 静态数组，1-based。预处理时间 $O(n)$，支持 $O(1)$ 查询任意子串哈希值。
-- *单哈希 (自然溢出)*：利用 `u64` 自然溢出等价于模 $2^64$，代码最短、常数最小。
-- *双哈希 (防卡模数)*：采用两个独立的大质数模数（如 $10^9+7, 10^9+9$）和不同基数，碰撞概率降至 $10^(-18)$ 级别，彻底防范针对自然溢出的恶意构造。
-- *二维矩阵哈希*：行、列两个方向分别乘不同基数，二维前缀和容斥，支持 $O(1)$ 查询任意子矩形哈希。
 
+=== 1. 哈希什么时候会被卡？(碰撞机理与防御策略)
+#table(
+  columns: (1.2fr, 1.8fr, 1.6fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [*哈希类型*], [*什么时候会被卡 (Hack 机理)*], [*防御方案与安全建议*],
+  [*`u64` 自然溢出单哈希*], [*Thue-Morse 序列卡自然溢出*：在模 $2^64$ 下，构造长度仅 $2^12 = 4096$ 的特殊 0/1 串差值恰为 0，CF 上大量题目已内置此 Anti-Hash 数据。], [采用*双模数哈希*（如模 $10^9+7, 10^9+9$）或运行期真随机基数。],
+  [*单大质数模数 (如 $10^9+7$)*], [*生日悖论 (Birthday Paradox)*：模数为 $M approx 10^9$ 时，仅需约 $sqrt(M) approx 3 times 10^4$ 个不同子串，碰撞概率便高达 $50%$；当子串数达 $10^5$ 时几乎必撞！], [必须使用*双模数*：模数积达 $10^18$，需 $10^9$ 级别串才会碰撞，彻底规避生日攻击。],
+  [*固定基数 (如 131, 13331)*], [*离线针对性多项式抵消*：出题人若已知基数与模数，可用高斯消元或反向字典序构造出具有完全相同哈希值的串。], [使用 `mt19937_64` 在*运行期随机生成奇数 Base*（出题人无法静态预测）。],
+  [*集合异或哈希*], [*非真随机导致异或假阳性*：若直接用元素原值异或，易出现 $a xor b = c xor d$（如 $1 xor 4 = 2 xor 3$）或相同数偶数次自动抵消为 0。], [每个不同值分配 64 位独立伪随机权值 `rng()`；判定多重集时必须结合*加法和与异或和双重哈希*。],
+  [*`std::unordered_map`*], [*GCC 恒等哈希退化 $O(n)$*：默认整数哈希为 $f(x)=x$，输入特定质数倍数使全部元素堆积在同一桶中导致严重 TLE。], [使用 `custom_hash` (SplitMix64) 异或混淆 + 时间戳掩码，或改用 `gp_hash_table`。],
+)
+
+=== 2. 核心模板实现
 ```cpp
 // 1. 自然溢出单哈希 (1-based, 极短好写)
 constexpr i32 maxn = 1000005;
@@ -1872,7 +1883,7 @@ inline u64 query_hash(i32 l, i32 r) {
     return h[r] - h[l - 1] * p[r - l + 1];
 }
 
-// 2. 双哈希 (双模数防 Hack，强对抗比赛推荐)
+// 2. 双模数双哈希 (双模数防 Hack，强对抗比赛推荐)
 constexpr i64 mod1 = 1000000007, mod2 = 1000000009;
 constexpr i64 b1 = 131, b2 = 13331;
 i64 h1[maxn], h2[maxn], p1[maxn], p2[maxn];
@@ -1894,7 +1905,14 @@ inline pair<i64, i64> query_double_hash(i32 l, i32 r) {
     return {v1, v2};
 }
 
-// 3. 二维矩阵哈希 (O(1) 查询子矩形 [x1..x2][y1..y2] 哈希)
+// 3. 运行期真随机基数 (彻底防御静态针对性数据)
+inline u64 get_random_base(u64 l = 256, u64 r = 1e9) {
+    mt19937_64 rng(chrono::steady_clock::now().time_since_epoch().count());
+    u64 b = uniform_int_distribution<u64>(l, r)(rng);
+    return (b % 2 == 0) ? b + 1 : b; // 保持奇数，与 2^64 互质
+}
+
+// 4. 二维矩阵哈希 (O(1) 查询子矩形 [x1..x2][y1..y2] 哈希)
 constexpr i32 maxm = 1005;
 u64 h2d[maxm][maxm], p_row[maxm], p_col[maxm];
 
@@ -1914,6 +1932,54 @@ inline u64 query_matrix_hash(i32 x1, i32 y1, i32 x2, i32 y2) {
     i32 dx = x2 - x1 + 1, dy = y2 - y1 + 1;
     return h2d[x2][y2] - h2d[x1 - 1][y2] * p_row[dx] - h2d[x2][y1 - 1] * p_col[dy]
          + h2d[x1 - 1][y1 - 1] * p_row[dx] * p_col[dy];
+}
+
+// 5. 动态单点修改字符串哈希 (线段树维护，支持 O(log n) 单点修改与区间查询)
+struct DynamicHash {
+    struct Node { u64 val = 0; i32 len = 0; } tr[maxn << 2];
+    Node merge(const Node& ls, const Node& rs) {
+        return {ls.val * p[rs.len] + rs.val, ls.len + rs.len};
+    }
+    void build(i32 u, i32 l, i32 r, const string& s) {
+        if (l == r) { tr[u] = {static_cast<u64>(s[l - 1]), 1}; return; }
+        i32 mid = l + (r - l) / 2;
+        build(u << 1, l, mid, s);
+        build(u << 1 | 1, mid + 1, r, s);
+        tr[u] = merge(tr[u << 1], tr[u << 1 | 1]);
+    }
+    void update(i32 u, i32 l, i32 r, i32 pos, char ch) {
+        if (l == r) { tr[u] = {static_cast<u64>(ch), 1}; return; }
+        i32 mid = l + (r - l) / 2;
+        if (pos <= mid) update(u << 1, l, mid, pos, ch);
+        else update(u << 1 | 1, mid + 1, r, pos, ch);
+        tr[u] = merge(tr[u << 1], tr[u << 1 | 1]);
+    }
+    Node query(i32 u, i32 l, i32 r, i32 ql, i32 qr) {
+        if (ql <= l && r <= qr) return tr[u];
+        i32 mid = l + (r - l) / 2;
+        if (qr <= mid) return query(u << 1, l, mid, ql, qr);
+        if (ql > mid) return query(u << 1 | 1, mid + 1, r, ql, qr);
+        return merge(query(u << 1, l, mid, ql, qr), query(u << 1 | 1, mid + 1, r, ql, qr));
+    }
+} dyn_hash;
+
+// 6. 异或哈希与多重集哈希 (集合相等 / 全排列 / 区间频次判定)
+u64 val_rnd[maxn], sum_xor[maxn], sum_add[maxn];
+
+void init_xor_hash(const vector<i32>& a, i32 max_val) {
+    mt19937_64 rng(chrono::steady_clock::now().time_since_epoch().count());
+    rep1(i, 1, max_val) val_rnd[i] = rng();
+    i32 n = sz(a);
+    rep1(i, 1, n) {
+        sum_xor[i] = sum_xor[i - 1] ^ val_rnd[a[i - 1]];
+        sum_add[i] = sum_add[i - 1] + val_rnd[a[i - 1]];
+    }
+}
+
+// O(1) 判定两区间元素多重集是否完全一致
+inline bool is_same_multiset(i32 l1, i32 r1, i32 l2, i32 r2) {
+    return (sum_add[r1] - sum_add[l1 - 1] == sum_add[r2] - sum_add[l2 - 1]) &&
+           ((sum_xor[r1] ^ sum_xor[l1 - 1]) == (sum_xor[r2] ^ sum_xor[l2 - 1]));
 }
 ```
 
