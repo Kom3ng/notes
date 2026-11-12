@@ -4595,52 +4595,62 @@ int main() {
 ```
 
 ==== (2) 标准 I/O 交互对拍 (Python 极简脚本)
-Codeforces 常见模式：选手与评测机通过标准输入输出交互。使用 Python `subprocess.Popen` 可提供*严格超时限制*和*逐行交互日志记录*，彻底避免双向死锁排查困难。
+Codeforces 常见模式：选手与评测机通过标准输入输出交互。使用 Python `subprocess.Popen` 可提供*严格超时限制*和*逐行交互日志记录*。特别提供 `forward_lines` 处理多行 `init_data`（如 $n$ 及 $m$ 条边）。
 ```python
-# interact.py: 标准 IO 交互题对拍中继器
+# interact.py: 标准 IO 交互题对拍中继器 (支持多行 init_data)
 import subprocess, sys
 
 def run_test(case_id):
-    # interactor 负责生成题目隐藏数据并判定，sol 为选手程序
     p_int = subprocess.Popen(['./interactor'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     p_sol = subprocess.Popen(['./sol'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     log = []
 
+    # 辅助函数: 转发指定行数的数据并记录日志 (解决多行 init_data 死锁)
+    def forward_lines(src, dst, count, role="Judge -> Sol"):
+        lines = []
+        for _ in range(count):
+            line = src.stdout.readline()
+            if not line: break
+            dst.stdin.write(line)
+            lines.append(line.strip())
+            log.append(f"{role}: {line.strip()}")
+        dst.stdin.flush()
+        return lines
+
     try:
-        # 1. 交互器先输出初始数据给选手 (如 n)
-        init_data = p_int.stdout.readline()
-        if init_data:
-            p_sol.stdin.write(init_data)
-            p_sol.stdin.flush()
-            log.append(f"Judge -> Sol: {init_data.strip()}")
+        # 1. 交互器先输出初始数据给选手 (注意: 许多题目初始数据是多行)
+        first_line = p_int.stdout.readline()
+        if first_line:
+            p_sol.stdin.write(first_line); p_sol.stdin.flush()
+            log.append(f"Judge -> Sol: {first_line.strip()}")
+            # 若首行给出了后续行数 (例如 n, m，后续跟 m 行树边):
+            # n, m = map(int, first_line.split())
+            # forward_lines(p_int, p_sol, m, role="Judge -> Sol")
 
         while True:
             # 2. 选手发起询问或报告答案
             sol_out = p_sol.stdout.readline()
             if not sol_out: break
             log.append(f"Sol -> Judge: {sol_out.strip()}")
-            p_int.stdin.write(sol_out)
-            p_int.stdin.flush()
+            p_int.stdin.write(sol_out); p_int.stdin.flush()
 
-            # 3. 交互器给出判定反馈
+            # 3. 交互器给出判定反馈 (若反馈也是多行，同样调用 forward_lines)
             judge_out = p_int.stdout.readline()
             if not judge_out: break
             log.append(f"Judge -> Sol: {judge_out.strip()}")
-            p_sol.stdin.write(judge_out)
-            p_sol.stdin.flush()
+            p_sol.stdin.write(judge_out); p_sol.stdin.flush()
 
             if judge_out.strip() in ("OK", "-1"): break
 
-        p_sol.wait(timeout=2.0)
-        p_int.wait(timeout=2.0)
+        p_sol.wait(timeout=2.0); p_int.wait(timeout=2.0)
         if p_int.returncode != 0:
             print(f"[WA on Test #{case_id}]")
-            print("\n".join(log[-10:])) # 打印末尾 10 条交互便于调试
+            print("\n".join(log[-10:]))
             return False
         return True
     except subprocess.TimeoutExpired:
         p_sol.kill(); p_int.kill()
-        print(f"[TLE / Deadlock on Test #{case_id}] (Check if missing fflush/endl)")
+        print(f"[TLE / Deadlock on Test #{case_id}] (Check if missing fflush/endl or unread init_data)")
         print("\n".join(log[-10:]))
         return False
 
@@ -4650,7 +4660,7 @@ print("All 100 interactive tests passed!")
 ```
 
 ==== (3) Linux 命名管道双向对拍 (Bash 免死锁)
-若不想写 Python，可利用 Linux `mkfifo` 命名管道。*注意*：必须使用 `exec 3<>p1 4<>p2`（读写双向描述符打开），若直接用 `< p1 > p2` 会导致两进程同时阻塞在 `open()` 产生死锁！
+若不想写 Python，可利用 Linux `mkfifo` 命名管道。*注意*：必须使用 `exec 3<>p1 4<>p2`（读写双向描述符打开），若直接用 `< p1 > p2` 会导致两进程同时阻塞在 `open()` 产生死锁！管道天然流式传输，不受初始数据多行限制。
 ```bash
 # 纯 Shell 交互对拍 (利用描述符 3/4 避免 open 阻塞死锁)
 rm -f p1 p2 && mkfifo p1 p2
@@ -4669,18 +4679,55 @@ fi
 ```
 
 === 3. 通信题对拍 (Communication Problems)
-通信题（如 IOI/CCO 经典题型）通常包含两个阶段：Alice 获取完整信息生成紧凑传输内容，Bob 仅根据传输内容还原信息或回答询问。双方程序独立运行，不可通过全局变量共享信息。
+通信题通常包含两个阶段：Alice 获取完整信息生成紧凑传输内容，Bob 仅根据传输内容（或外加公共初始数据）还原信息或回答询问。双方程序独立运行，不可通过全局变量共享信息。
 
-==== 函数调用式通信对拍 (Alice & Bob 本地信道模拟)
+==== (1) 进程式通信对拍 (独立可执行文件 / 支持多行复杂 init_data)
+在许多平台中，Alice 和 Bob 是两个独立编译的进程。初始测试数据 `in.txt` 通常包含多行信息（如 $N, M$、树边、矩阵等）。
+```bash
+# 进程式两阶段通信对拍 Shell 脚本 (支持多行数据与信道监控)
+cnt=0
+while true; do
+    cnt=$((cnt+1))
+    ./gen > in.txt # 1. 生成多行测试数据 (包含 n, m, 边列表等多行 init_data)
+
+    # 2. 阶段一: Alice 读入多行数据，输出通信编码 (行数/字符受限)
+    ./alice < in.txt > msg.txt
+
+    # 3. 检查通信代价 (如限制行数或总字符数)
+    chars=$(wc -c < msg.txt)
+    if [ $chars -gt 10000 ]; then
+        echo "FAIL on #$cnt: Message size $chars bytes exceeds limit!"
+        break
+    fi
+
+    # 4. 模拟信道干扰 (如题目包含翻转某一位或截断，可经 channel 处理；若无干扰直接传递)
+    # ./channel < msg.txt > msg_bob.txt
+    cp msg.txt msg_bob.txt
+
+    # 5. 阶段二: Bob 解码 (若题目规定 Bob 也能读取部分公共输入，可用 cat public.txt msg_bob.txt)
+    ./bob < msg_bob.txt > out.txt
+
+    # 6. 裁判校验最终解答是否与原数据一致
+    if ! ./checker in.txt out.txt > /dev/null 2>&1; then
+        echo "WA on Test #$cnt!"
+        break
+    fi
+    printf "Test #%d AC \n" "$cnt"
+done
+```
+
+==== (2) 函数调用式通信对拍 (Alice & Bob 本地信道模拟)
+IOI/NOI 常见模式：评测机调用 Alice 传入多行结构化数据（如树边列表），Alice 编码传出后经信道送至 Bob。
 ```cpp
-// grader.cpp (模拟信道扰动、传输代价监控与评测)
+// grader.cpp (模拟信道扰动、传输代价监控与多行数据评测)
 #include <bits/stdc++.h>
 using namespace std;
 using i32 = int32_t;
 
 // 1. 选手实现的两个角色 (必须使用独立 namespace，严禁共用全局变量)
 namespace Alice {
-    vector<bool> encode(i32 secret_x, i32 n) {
+    // 接收多行结构化数据 (如 n 个节点和边列表)
+    vector<bool> encode(i32 n, i32 secret_x, const vector<pair<i32, i32>>& edges) {
         vector<bool> bits;
         for (i32 i = 0; i < 20; ++i) bits.push_back((secret_x >> i) & 1);
         return bits;
@@ -4688,7 +4735,8 @@ namespace Alice {
 }
 
 namespace Bob {
-    i32 decode(const vector<bool>& bits, i32 n) {
+    // 接收信道数据并还原
+    i32 decode(i32 n, const vector<bool>& bits) {
         i32 x = 0;
         for (i32 i = 0; i < (i32)bits.size(); ++i) {
             if (bits[i]) x |= (1 << i);
@@ -4705,9 +4753,13 @@ int main() {
     for (i32 test = 1; test <= 1000; ++test) {
         i32 n = 100000;
         i32 x = uniform_int_distribution<i32>(0, n)(rng);
+        vector<pair<i32, i32>> edges; // 模拟多行树边数据
+        for (i32 i = 2; i <= n; ++i) {
+            edges.push_back({uniform_int_distribution<i32>(1, i - 1)(rng), i});
+        }
 
         // 阶段一: Alice 编码
-        vector<bool> channel = Alice::encode(x, n);
+        vector<bool> channel = Alice::encode(n, x, edges);
 
         // 检查带宽代价
         if ((i32)channel.size() > MAX_BITS) {
@@ -4719,7 +4771,7 @@ int main() {
         // channel[0] = !channel[0];
 
         // 阶段二: Bob 解码
-        i32 recovered_x = Bob::decode(channel, n);
+        i32 recovered_x = Bob::decode(n, channel);
 
         // 校验正确性
         if (recovered_x != x) {
@@ -4803,6 +4855,7 @@ int main() {
   stroke: 0.5pt + luma(180),
   [*失分/踩坑陷阱*], [*典型现象与报错*], [*标准防御与最佳实践*],
   [缓冲区未刷新], [评测返回 *TLE*，本地测试时程序永久卡死], [标准 I/O 每次输出必须使用 `cout << endl` 或 `cout << '\n' << flush`；禁止仅输出 `'\n'` 不 flush。],
+  [初始多行数据未读完], [对拍中继器与选手程序互相卡死 TLE], [题目首先输出多行 init_data（如 n 及边列表），对拍脚本切忌仅 `readline()` 一行。必须根据首行指示或题目行数完整转发全部初始行，否则选手卡在读数据、脚本卡在等输出引发死锁。],
   [退出信号未捕获], [评测明明答案错误，却返回 *TLE* 而非 *WA*], [若读取到交互器返回的退出标记（如 `-1` 或 EOF），*必须立即 `exit(0)`*，否则程序会陷入无响应死锁。],
   [命名空间变量污染], [通信题本地对拍 AC，提交线上全 WA], [本地联合编译时 Alice 与 Bob 运行在同一进程，若不分 `namespace`，容易因同名全局变量共享而“作弊”。],
   [FIFO 管道打开死锁], [Shell 命名管道对拍直接无输出卡死], [切勿使用 `< p1 > p2 & < p2 > p1`，必须使用 `exec 3<>p1 4<>p2` 读写双向打开，避免 `open()` 相互等待。],
