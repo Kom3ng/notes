@@ -1660,6 +1660,131 @@ struct Frac {
 };
 ```
 
+== 哈夫曼树与编码 (Huffman Tree & Coding)
+最优二叉前缀编码树。带权路径长度 $W P L = sum w_i dot "depth"_i$ 最小。
+- *核心性质*：
+  1. *WPL 快速求和*：$W P L$ 恰好等于所有合并产生的新节点权值总和，求最小代价时无需显式建树；
+  2. *前缀码无二义性*：左子树分支记为 `'0'`、右子树分支记为 `'1'`，任何字符编码均不是其余字符编码的前缀；
+  3. *$k$ 叉哈夫曼树*：每次选取最小的 $k$ 个节点合并。若 $(n - 1) mod (k - 1) != 0$，需先补足权值为 0 的虚假叶节点，使剩余叶子总数满足满 $k$ 叉树条件；
+  4. *最长编码最短化*：若要求 $W P L$ 最小的前提下最长编码长度（最大深度）最短，在优先队列中以 `{权值, 深度}` 为双关键字升序排列，深度较浅者优先合并。
+
+```cpp
+// 1. 标准二叉哈夫曼树 (建树、生成前缀编码表与解码还原)
+struct HuffmanTree {
+    struct Node {
+        i64 weight;
+        i32 id; // 叶子编号 (-1 表示非叶子节点)
+        i32 left = -1, right = -1;
+    };
+
+    vector<Node> tree;
+    i32 root = -1;
+    i64 wpl = 0; // 带权路径长度 Weighted Path Length
+
+    HuffmanTree() {}
+
+    // 根据叶节点权值构建哈夫曼树
+    void build(const vector<i64>& weights) {
+        i32 n = sz(weights);
+        if (n == 0) return;
+        tree.clear();
+        wpl = 0;
+
+        using Element = pair<i64, i32>; // {weight, node_idx}
+        priority_queue<Element, vector<Element>, greater<Element>> pq;
+
+        rep(i, 0, n) {
+            tree.push_back({weights[i], i, -1, -1});
+            pq.push({weights[i], i});
+        }
+        if (n == 1) {
+            root = 0;
+            wpl = weights[0];
+            return;
+        }
+
+        while (sz(pq) > 1) {
+            auto [w1, u1] = pq.top(); pq.pop();
+            auto [w2, u2] = pq.top(); pq.pop();
+            i64 combined = w1 + w2;
+            wpl += combined; // 每次合并的新权值累加即为总 WPL
+            i32 new_id = sz(tree);
+            tree.push_back({combined, -1, u1, u2});
+            pq.push({combined, new_id});
+        }
+        root = pq.top().second;
+    }
+
+    // 生成每个叶节点对应的可变长 0/1 前缀编码表
+    map<i32, string> generate_codes() const {
+        map<i32, string> codes;
+        if (root == -1) return codes;
+        if (tree[root].left == -1 && tree[root].right == -1) {
+            codes[tree[root].id] = "0";
+            return codes;
+        }
+
+        auto dfs = [&](auto& self, i32 u, string cur) -> void {
+            if (tree[u].left == -1 && tree[u].right == -1) {
+                codes[tree[u].id] = cur;
+                return;
+            }
+            if (tree[u].left != -1) self(self, tree[u].left, cur + "0");
+            if (tree[u].right != -1) self(self, tree[u].right, cur + "1");
+        };
+
+        dfs(dfs, root, "");
+        return codes;
+    }
+
+    // 根据 0/1 编码串解码还原原始叶节点 ID 序列
+    vector<i32> decode(const string& s) const {
+        vector<i32> res;
+        if (root == -1) return res;
+        i32 cur = root;
+        for (char ch : s) {
+            cur = (ch == '0') ? tree[cur].left : tree[cur].right;
+            if (tree[cur].left == -1 && tree[cur].right == -1) {
+                res.push_back(tree[cur].id);
+                cur = root;
+            }
+        }
+        return res;
+    }
+};
+
+// 2. k 叉哈夫曼树 (求解最小 WPL 与最短最大深度)
+// 包含 (n - 1) % (k - 1) != 0 补虚节点，以及 {weight, depth} 双关键字贪心
+pair<i64, i32> k_ary_huffman(vector<i64> weights, i32 k) {
+    i32 n = sz(weights);
+    if (n <= 1) return {0, 0};
+
+    // 补齐权值为 0 的虚节点使总合并轮数整除
+    while ((sz(weights) - 1) % (k - 1) != 0) {
+        weights.push_back(0);
+    }
+
+    using Element = pair<i64, i32>; // {权值, 节点深度}
+    priority_queue<Element, vector<Element>, greater<Element>> pq;
+    for (i64 w : weights) pq.push({w, 1});
+
+    i64 total_wpl = 0;
+    while (sz(pq) > 1) {
+        i64 sum_w = 0;
+        i32 max_d = 0;
+        rep(step, 0, k) {
+            if (pq.empty()) break;
+            auto [w, d] = pq.top(); pq.pop();
+            sum_w += w;
+            max_d = max(max_d, d);
+        }
+        total_wpl += sum_w;
+        pq.push({sum_w, max_d + 1});
+    }
+    return {total_wpl, pq.top().second - 1};
+}
+```
+
 = DP
 静态全局数组，0-based：
 
