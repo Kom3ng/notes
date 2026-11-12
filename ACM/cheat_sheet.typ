@@ -517,81 +517,30 @@ pair<i64, i64> mcmf(i32 s, i32 t, i32 num_nodes) {
 = 数据结构
 
 == ST 表 (Sparse Table / RMQ)
-基于倍增思想处理静态区间查询的数据结构。预处理时间 $O(n log n)$，空间复杂度 $O(n log n)$。
-- *可重复贡献问题 (Idempotent)*：满足 $f(x, x) = x$ 的运算（如 $"max"$、$"min"$、$"gcd"$、$"lcm"$、按位与/或），可通过两段长度为 $2^k$ 且覆盖 $[l, r]$ 的重叠区间在 *$O(1)$* 内完成查询：$k = floor(log_2(r - l + 1))$，$f("st"[k][l], "st"[k][r - 2^k + 1])$。
-- *不可重复贡献问题*：对于一般半群运算（如区间和、异或和、矩阵乘法），可通过二进制位拆分在 *$O(log n)$* 内组合出区间结果。
+静态全局数组，1-based。预处理 $O(n log n)$，单次区间查询 $O(1)$。
+- 适用于具有*可重复贡献性质*的运算（$"max"$、$"min"$、$"gcd"$ 等，满足 $f(x, x) = x$）。两段长度为 $2^s$ 的重叠区间覆盖 $[l, r]$，其中 $s = floor(log_2(r - l + 1))$。
 
 ```cpp
-// 1. 通用模板化 ST 表 (支持自定义结合运算，0-based)
-template <typename T, typename Op = std::plus<T>>
-struct SparseTable {
-    i32 n;
-    Op op;
-    vector<vector<T>> st;
-    vector<i32> lg;
+constexpr i32 maxn = 200005;
+constexpr i32 logn = 21;
+i32 st[logn][maxn], lg[maxn];
 
-    SparseTable() : n(0) {}
-    SparseTable(const vector<T>& a, Op op = Op()) : n(sz(a)), op(op) {
-        if (n == 0) return;
-        lg.assign(n + 1, 0);
-        rep(i, 2, n + 1) lg[i] = lg[i / 2] + 1;
-        i32 max_k = lg[n] + 1;
-        st.assign(max_k, vector<T>(n));
-        st[0] = a;
-        rep(k, 1, max_k) {
-            i32 len = 1 << (k - 1);
-            rep(i, 0, n - (1 << k) + 1) {
-                st[k][i] = op(st[k - 1][i], st[k - 1][i + len]);
-            }
-        }
-    }
-
-    // O(1) 查询 [l, r] (要求 op 满足可重复贡献性质: min / max / gcd / bitwise)
-    T query_idempotent(i32 l, i32 r) const {
-        i32 k = lg[r - l + 1];
-        return op(st[k][l], st[k][r - (1 << k) + 1]);
-    }
-
-    // O(log n) 查询 [l, r] (通用半群拆分，适用于不可重复贡献运算如求和)
-    T query_general(i32 l, i32 r) const {
-        T res{};
-        bool first = true;
-        for (i32 k = lg[r - l + 1]; k >= 0; --k) {
-            if ((1 << k) <= r - l + 1) {
-                if (first) {
-                    res = st[k][l];
-                    first = false;
-                } else {
-                    res = op(res, st[k][l]);
-                }
-                l += (1 << k);
-            }
-        }
-        return res;
-    }
-};
-
-// 2. 静态数组扁平化极简 ST 表 (现场快速手打 RMQ, 1-based)
-constexpr i32 MAXN = 200005;
-constexpr i32 MAXLOG = 20;
-i32 st_max[MAXLOG][MAXN], lg2[MAXN];
-
-void st_init(const vector<i32>& a, i32 n) {
-    lg2[1] = 0;
-    rep1(i, 2, n) lg2[i] = lg2[i >> 1] + 1;
-    rep1(i, 1, n) st_max[0][i] = a[i];
-    rep(k, 1, MAXLOG) {
-        i32 len = 1 << (k - 1);
-        rep1(i, 1, n - (1 << k) + 1) {
-            st_max[k][i] = max(st_max[k - 1][i], st_max[k - 1][i + len]);
+void init(const i32 a[], i32 n) {
+    lg[1] = 0;
+    rep1(i, 2, n) lg[i] = lg[i >> 1] + 1;
+    rep1(i, 1, n) st[0][i] = a[i];
+    rep(j, 1, logn) {
+        rep1(i, 1, n - (1 << j) + 1) {
+            st[j][i] = max(st[j - 1][i], st[j - 1][i + (1 << (j - 1))]);
         }
     }
 }
 
-inline i32 st_query_max(i32 l, i32 r) {
-    i32 k = lg2[r - l + 1];
-    return max(st_max[k][l], st_max[k][r - (1 << k) + 1]);
+i32 query(i32 l, i32 r) {
+    i32 s = lg[r - l + 1];
+    return max(st[s][l], st[s][r - (1 << s) + 1]);
 }
+// 若需求 min / gcd，只需将 max 替换为 min 或 std::gcd
 ```
 
 == 树状数组
