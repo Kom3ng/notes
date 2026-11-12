@@ -4200,7 +4200,9 @@ inline f64 tetrahedron_volume(const Point3& a, const Point3& b, const Point3& c,
 
 
 = Tricks
-== 对拍
+== 对拍体系 (Stress Testing)
+
+=== 1. 传统离线题对拍 (Bash 自动化)
 ```bash
 cnt=0
 g++ -O2 -std=c++20  -g gen.cpp -o gen || exit 1
@@ -4227,6 +4229,155 @@ while true; do
 	printf "Test #%d AC \n" "$cnt"
 done
 ```
+
+=== 2. 交互题对拍 (Interactive Problems)
+交互题分为*函数调用式（Grader 库交互）*与*标准 I/O 进程交互（命令行一问一答）*两类。
+
+==== (1) 函数调用式交互对拍 (本地 Mock Grader)
+IOI/NOI 常见模式：选手编写 `sol.cpp` 实现函数，本地手写轻量 `grader.cpp` 联合编译。单进程直接调用，*零死锁风险*，支持查询次数统计与数据隐藏。
+```cpp
+// grader.cpp (联合编译: g++ -O2 -std=c++20 grader.cpp sol.cpp -o run)
+#include <bits/stdc++.h>
+using namespace std;
+using i32 = int32_t;
+
+// 1. 选手需实现的接口
+void solve(i32 n);
+
+// 2. Grader 模拟评测环境
+namespace MockGrader {
+    static i32 secret_target;
+    static i32 query_cnt = 0;
+    static constexpr i32 MAX_QUERIES = 30; // 题目设定的询问次数上限
+    static bool answered = false;
+
+    void init(i32 target) {
+        secret_target = target;
+        query_cnt = 0;
+        answered = false;
+    }
+
+    i32 query(i32 x) {
+        ++query_cnt;
+        if (query_cnt > MAX_QUERIES) {
+            cerr << "[FAIL] Query limit exceeded! (> " << MAX_QUERIES << ")\n";
+            exit(1);
+        }
+        if (x < secret_target) return -1;
+        if (x > secret_target) return 1;
+        return 0;
+    }
+
+    void answer(i32 ans) {
+        answered = true;
+        if (ans != secret_target) {
+            cerr << "[WA] Expected " << secret_target << ", got " << ans << "\n";
+            exit(1);
+        }
+    }
+}
+
+// 暴露给 sol.cpp 的全局接口
+i32 query(i32 x) { return MockGrader::query(x); }
+void answer(i32 ans) { MockGrader::answer(ans); }
+
+// 3. 本地对拍驱动主函数
+int main() {
+    mt19937 rng(1337);
+    for (i32 test = 1; test <= 1000; ++test) {
+        i32 n = 1000000;
+        i32 target = uniform_int_distribution<i32>(1, n)(rng);
+        MockGrader::init(target);
+
+        solve(n); // 调用选手算法
+
+        if (!MockGrader::answered) {
+            cerr << "[WA] Test #" << test << ": solve() exited without calling answer()!\n";
+            return 1;
+        }
+        if (test % 100 == 0) {
+            cout << "Passed test #" << test << " (Queries: " << MockGrader::query_cnt << ")\n";
+        }
+    }
+    cout << "All 1000 interactive tests AC!\n";
+    return 0;
+}
+```
+
+==== (2) 标准 I/O 交互对拍 (Python 极简脚本)
+Codeforces 常见模式：选手与评测机通过标准输入输出交互。使用 Python `subprocess.Popen` 可提供*严格超时限制*和*逐行交互日志记录*，彻底避免双向死锁排查困难。
+```python
+# interact.py: 标准 IO 交互题对拍中继器
+import subprocess, sys
+
+def run_test(case_id):
+    # interactor 负责生成题目隐藏数据并判定，sol 为选手程序
+    p_int = subprocess.Popen(['./interactor'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    p_sol = subprocess.Popen(['./sol'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    log = []
+
+    try:
+        # 1. 交互器先输出初始数据给选手 (如 n)
+        init_data = p_int.stdout.readline()
+        if init_data:
+            p_sol.stdin.write(init_data)
+            p_sol.stdin.flush()
+            log.append(f"Judge -> Sol: {init_data.strip()}")
+
+        while True:
+            # 2. 选手发起询问或报告答案
+            sol_out = p_sol.stdout.readline()
+            if not sol_out: break
+            log.append(f"Sol -> Judge: {sol_out.strip()}")
+            p_int.stdin.write(sol_out)
+            p_int.stdin.flush()
+
+            # 3. 交互器给出判定反馈
+            judge_out = p_int.stdout.readline()
+            if not judge_out: break
+            log.append(f"Judge -> Sol: {judge_out.strip()}")
+            p_sol.stdin.write(judge_out)
+            p_sol.stdin.flush()
+
+            if judge_out.strip() in ("OK", "-1"): break
+
+        p_sol.wait(timeout=2.0)
+        p_int.wait(timeout=2.0)
+        if p_int.returncode != 0:
+            print(f"[WA on Test #{case_id}]")
+            print("\n".join(log[-10:])) # 打印末尾 10 条交互便于调试
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        p_sol.kill(); p_int.kill()
+        print(f"[TLE / Deadlock on Test #{case_id}] (Check if missing fflush/endl)")
+        print("\n".join(log[-10:]))
+        return False
+
+for i in range(1, 101):
+    if not run_test(i): sys.exit(1)
+print("All 100 interactive tests passed!")
+```
+
+==== (3) Linux 命名管道双向对拍 (Bash 免死锁)
+若不想写 Python，可利用 Linux `mkfifo` 命名管道。*注意*：必须使用 `exec 3<>p1 4<>p2`（读写双向描述符打开），若直接用 `< p1 > p2` 会导致两进程同时阻塞在 `open()` 产生死锁！
+```bash
+# 纯 Shell 交互对拍 (利用描述符 3/4 避免 open 阻塞死锁)
+rm -f p1 p2 && mkfifo p1 p2
+exec 3<>p1 4<>p2
+./interactor <&3 >&4 &
+PID_INT=$!
+./sol <&4 >&3
+SOL_RET=$?
+wait $PID_INT
+INT_RET=$?
+exec 3>&- 3<&- 4>&- 4<&-
+rm -f p1 p2
+if [ $SOL_RET -ne 0 ] || [ $INT_RET -ne 0 ]; then
+    echo "Interactive test failed: sol=$SOL_RET, interactor=$INT_RET"
+fi
+```
+
 
 == 二进制操作与位运算技巧 (C++20 `<bit>` & GCC Builtins)
 *`__builtin_clz(0)` 和 `__builtin_ctz(0)` 是未定义行为*。
