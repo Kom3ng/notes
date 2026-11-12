@@ -4378,6 +4378,148 @@ if [ $SOL_RET -ne 0 ] || [ $INT_RET -ne 0 ]; then
 fi
 ```
 
+=== 3. 通信题对拍 (Communication Problems)
+通信题（如 IOI/CCO 经典题型）通常包含两个阶段：Alice 获取完整信息生成紧凑传输内容，Bob 仅根据传输内容还原信息或回答询问。双方程序独立运行，不可通过全局变量共享信息。
+
+==== 函数调用式通信对拍 (Alice & Bob 本地信道模拟)
+```cpp
+// grader.cpp (模拟信道扰动、传输代价监控与评测)
+#include <bits/stdc++.h>
+using namespace std;
+using i32 = int32_t;
+
+// 1. 选手实现的两个角色 (必须使用独立 namespace，严禁共用全局变量)
+namespace Alice {
+    vector<bool> encode(i32 secret_x, i32 n) {
+        vector<bool> bits;
+        for (i32 i = 0; i < 20; ++i) bits.push_back((secret_x >> i) & 1);
+        return bits;
+    }
+}
+
+namespace Bob {
+    i32 decode(const vector<bool>& bits, i32 n) {
+        i32 x = 0;
+        for (i32 i = 0; i < (i32)bits.size(); ++i) {
+            if (bits[i]) x |= (1 << i);
+        }
+        return x;
+    }
+}
+
+// 2. 本地自动化调度与信道模拟
+int main() {
+    mt19937 rng(42);
+    constexpr i32 MAX_BITS = 20; // 题目限制通信上限
+
+    for (i32 test = 1; test <= 1000; ++test) {
+        i32 n = 100000;
+        i32 x = uniform_int_distribution<i32>(0, n)(rng);
+
+        // 阶段一: Alice 编码
+        vector<bool> channel = Alice::encode(x, n);
+
+        // 检查带宽代价
+        if ((i32)channel.size() > MAX_BITS) {
+            cerr << "[FAIL] Test #" << test << ": Bit limit exceeded! (" << channel.size() << " > " << MAX_BITS << ")\n";
+            return 1;
+        }
+
+        // 模拟信道干扰 (如题目包含噪声/翻转/乱序):
+        // channel[0] = !channel[0];
+
+        // 阶段二: Bob 解码
+        i32 recovered_x = Bob::decode(channel, n);
+
+        // 校验正确性
+        if (recovered_x != x) {
+            cerr << "[WA] Test #" << test << ": Expected " << x << ", got " << recovered_x << "\n";
+            return 1;
+        }
+    }
+    cout << "Communication 1000 tests AC!\n";
+    return 0;
+}
+```
+
+=== 4. 通信交互题对拍 (Interactive Communication)
+Alice 与 Bob 各自掌握部分私有信息，需在有限轮次内双向多轮交替通信，协同解决问题（如寻找共同连通块、二分协商）。
+
+==== 双向多轮交替通信状态机 (Mediator Grader)
+```cpp
+// mediator.cpp: 中介裁判状态机驱动双向多轮交互
+#include <bits/stdc++.h>
+using namespace std;
+using i32 = int32_t;
+
+namespace Alice {
+    static i32 my_val;
+    void init(i32 v) { my_val = v; }
+    // 收到 Bob 消息，给出回应；返回 -1 表示本方宣布结束
+    i32 round_step(i32 bob_msg, bool is_first) {
+        if (is_first) return my_val; // 首轮发起数据
+        return -1; // 达成共识，结束通信
+    }
+}
+
+namespace Bob {
+    static i32 my_val;
+    void init(i32 v) { my_val = v; }
+    // 收到 Alice 消息，做出决策或回发新消息
+    i32 round_step(i32 alice_msg) {
+        return my_val + alice_msg;
+    }
+}
+
+int main() {
+    mt19937 rng(1337);
+    constexpr i32 MAX_ROUNDS = 5; // 轮次限制
+
+    for (i32 test = 1; test <= 1000; ++test) {
+        i32 a_val = uniform_int_distribution<i32>(1, 100)(rng);
+        i32 b_val = uniform_int_distribution<i32>(1, 100)(rng);
+        Alice::init(a_val);
+        Bob::init(b_val);
+
+        i32 alice_msg = Alice::round_step(0, true); // Alice 执先手
+        i32 bob_msg = 0, rounds = 0;
+
+        while (true) {
+            ++rounds;
+            if (rounds > MAX_ROUNDS) {
+                cerr << "[FAIL] Max communication rounds exceeded!\n";
+                return 1;
+            }
+            bob_msg = Bob::round_step(alice_msg);
+            alice_msg = Alice::round_step(bob_msg, false);
+            if (alice_msg == -1) break; // 通信协议正常收敛
+        }
+
+        // 裁判校验最终协商结果
+        if (bob_msg != a_val + b_val) {
+            cerr << "[WA] Test #" << test << ": Inconsistent state!\n";
+            return 1;
+        }
+    }
+    cout << "Interactive Communication 1000 tests AC!\n";
+    return 0;
+}
+```
+
+=== 5. 交互与通信题核心避坑指南
+#table(
+  columns: (auto, 1.2fr, 1.5fr),
+  fill: (col, row) => if row == 0 { rgb("f0f2f5") } else { none },
+  stroke: 0.5pt + luma(180),
+  [*失分/踩坑陷阱*], [*典型现象与报错*], [*标准防御与最佳实践*],
+  [缓冲区未刷新], [评测返回 *TLE*，本地测试时程序永久卡死], [标准 I/O 每次输出必须使用 `cout << endl` 或 `cout << '\n' << flush`；禁止仅输出 `'\n'` 不 flush。],
+  [退出信号未捕获], [评测明明答案错误，却返回 *TLE* 而非 *WA*], [若读取到交互器返回的退出标记（如 `-1` 或 EOF），*必须立即 `exit(0)`*，否则程序会陷入无响应死锁。],
+  [命名空间变量污染], [通信题本地对拍 AC，提交线上全 WA], [本地联合编译时 Alice 与 Bob 运行在同一进程，若不分 `namespace`，容易因同名全局变量共享而“作弊”。],
+  [FIFO 管道打开死锁], [Shell 命名管道对拍直接无输出卡死], [切勿使用 `< p1 > p2 & < p2 > p1`，必须使用 `exec 3<>p1 4<>p2` 读写双向打开，避免 `open()` 相互等待。],
+  [交互次数/代价超标], [超出询问上限返回 *WA* 或 *Idleness limit*], [写对拍 Grader 时务必设置 `MAX_QUERIES` / `MAX_BITS` 计数器并在越界时主动报错。],
+)
+
+
 
 == 二进制操作与位运算技巧 (C++20 `<bit>` & GCC Builtins)
 *`__builtin_clz(0)` 和 `__builtin_ctz(0)` 是未定义行为*。
